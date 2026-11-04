@@ -1,0 +1,15 @@
+# Go
+/bin/
+/dist/
+*.test
+*.out
+coverage.txt
+
+# Local data and generated results
+/data/
+/results/
+/tmp/
+
+# IDE and operating system
+.vscode/
+.DS_Store
