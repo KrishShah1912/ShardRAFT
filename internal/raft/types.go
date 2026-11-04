@@ -40,6 +40,7 @@ const (
 )
 
 // Message represents communication between nodes.
+
 type Message struct {
 	Type MessageType
 
@@ -50,6 +51,9 @@ type Message struct {
 	LogTerm uint64
 	Index   uint64
 	Commit  uint64
+
+	// Correlates AppendEntries requests and responses.
+	RequestID uint64
 
 	Entries []Entry
 	Reject  bool

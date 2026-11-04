@@ -16,7 +16,14 @@ type Raft struct {
 	votes    map[NodeID]bool
 	messages []Message
 
+	// Track log replication progress for each follower.
+	nextIndex  map[NodeID]uint64
+	matchIndex map[NodeID]uint64
+
 	heartbeatTimeout int
+
+	nextRequestID uint64
+	pendingAppend map[NodeID]map[uint64]uint64
 }
 
 var _ Consensus = (*Raft)(nil)
@@ -35,6 +42,9 @@ func NewRaft(
 		id:               id,
 		peers:            append([]NodeID(nil), peers...),
 		votes:            make(map[NodeID]bool),
+		nextIndex:        make(map[NodeID]uint64),
+		matchIndex:       make(map[NodeID]uint64),
+		pendingAppend:    make(map[NodeID]map[uint64]uint64),
 		heartbeatTimeout: 2,
 	}
 
@@ -76,10 +86,15 @@ func (r *Raft) Step(msg Message) error {
 	switch msg.Type {
 	case MsgVote:
 		r.handleVoteRequest(msg)
+
 	case MsgVoteResp:
 		r.handleVoteResponse(msg)
+
 	case MsgHeartbeat, MsgAppend:
 		r.handleAppend(msg)
+
+	case MsgAppendResp:
+		r.handleAppendResponse(msg)
 	}
 
 	return nil
@@ -89,7 +104,14 @@ func (r *Raft) Propose(data []byte) error {
 	if r.volatile.Role != Leader {
 		return ErrNotLeader
 	}
-	return ErrNotImplemented
+
+	r.appendEntry(data, EntryNormal)
+	r.replicate()
+
+	// Also handles immediate majority in a one-node cluster.
+	r.maybeCommit()
+
+	return nil
 }
 
 func (r *Raft) ReadIndex(ctx []byte) error {
@@ -122,12 +144,18 @@ func (r *Raft) majority() int {
 
 func (r *Raft) sendHeartbeats() {
 	for _, peer := range r.peers {
+		// Use the last index known to be replicated
+		// on this follower, not the leader's last index.
+		matchIndex := r.matchIndex[peer]
+
 		r.messages = append(r.messages, Message{
-			Type:   MsgHeartbeat,
-			From:   r.id,
-			To:     peer,
-			Term:   r.hard.Term,
-			Commit: r.hard.Commit,
+			Type:    MsgHeartbeat,
+			From:    r.id,
+			To:      peer,
+			Term:    r.hard.Term,
+			Index:   matchIndex,
+			LogTerm: r.termAt(matchIndex),
+			Commit:  r.hard.Commit,
 		})
 	}
 }
