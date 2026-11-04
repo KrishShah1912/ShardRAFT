@@ -13,3 +13,5 @@ coverage.txt
 # IDE and operating system
 .vscode/
 .DS_Store
+
+/shardraft
