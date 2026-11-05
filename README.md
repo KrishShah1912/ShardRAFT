@@ -1,11 +1,11 @@
 
 # ShardRAFT
 
-### Building a Fault-Tolerant Distributed Key-Value Database from Scratch in Go
+### Building a Fault-Tolerant Distributed Key-Value Database
 
 **Project Status:** Active Development — Raft Consensus Prototype Implemented and Tested
 
-**Team Members:** Krish Shah, Hetansh Patel , SriVeda 
+**Team Members:** Krish Shah, Hetansh Patel , Sri Veda 
 
 ---
 
