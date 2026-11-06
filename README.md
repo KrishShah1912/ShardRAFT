@@ -5,15 +5,13 @@
 
 **Project Status:** Active Development — Raft Consensus Prototype Implemented and Tested
 
-**Team Members:** Krish Shah, Hetansh Patel , Sri Veda 
+**Team Members:** Krish Shah, Hetansh Patel, Sri Veda 
 
 ---
 
 ## 1. Overview
 
-ShardRAFT is a distributed database project built to explore how multiple machines can coordinate, replicate data, recover from failures, and maintain consistency.
-
-The project is being developed incrementally, starting with a custom implementation of the **Raft consensus algorithm** in Go.
+ShardRAFT is a distributed database project designed to explore how multiple machines can coordinate, replicate data, recover from failures, and maintain strong consistency. The project is currently in active development, focusing on a custom implementation of the Raft consensus algorithm built in Go.
 
 The long-term goal is to build a complete distributed key-value database featuring:
 
