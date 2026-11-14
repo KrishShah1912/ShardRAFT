@@ -60,6 +60,93 @@ func NewRaft(
 	return r
 }
 
+// NewRaftFromState restores a Raft node from persisted state.
+//
+// A recovered node always starts as a follower.
+// Persisted entries and HardState are marked stable.
+//
+// Committed entries remain available for replay into
+// the application state machine.
+func NewRaftFromState(
+	id NodeID,
+	peers []NodeID,
+	electionTimeout int,
+	state PersistentState,
+) (*Raft, error) {
+	// Validate the recovered commit index.
+	if state.HardState.Commit > uint64(len(state.Log)) {
+		return nil, errors.New(
+			"recovered commit index exceeds log length",
+		)
+	}
+
+	// A vote cannot exist without an election term.
+	if state.HardState.Term == 0 &&
+		state.HardState.Vote != 0 {
+		return nil, errors.New(
+			"recovered vote exists without a term",
+		)
+	}
+
+	// Validate recovered log indexes and terms.
+	for i, entry := range state.Log {
+		expectedIndex := uint64(i + 1)
+
+		if entry.Index != expectedIndex {
+			return nil, errors.New(
+				"recovered log contains invalid index",
+			)
+		}
+
+		if entry.Term == 0 {
+			return nil, errors.New(
+				"recovered log contains zero term",
+			)
+		}
+
+		if i > 0 && entry.Term < state.Log[i-1].Term {
+			return nil, errors.New(
+				"recovered log contains decreasing terms",
+			)
+		}
+
+		if entry.Term > state.HardState.Term {
+			return nil, errors.New(
+				"recovered log term exceeds current term",
+			)
+		}
+	}
+
+	// Construct a fresh Raft node.
+	r := NewRaft(id, peers, electionTimeout)
+
+	// Restore persistent metadata.
+	r.hard = state.HardState
+
+	// Deep-copy recovered log entries.
+	r.log = cloneEntries(state.Log)
+
+	// Recovered state is already persisted.
+	r.stableHard = state.HardState
+	r.stableLog = cloneEntries(state.Log)
+
+	// Always restart as follower.
+	r.volatile.Role = Follower
+	r.volatile.LeaderID = 0
+
+	// Restore the commit index.
+	r.volatile.CommitIndex = state.HardState.Commit
+
+	// Replay committed entries before normal operation.
+	r.volatile.AppliedIndex = 0
+
+	// Reset election and heartbeat timers.
+	r.volatile.ElectionElapsed = 0
+	r.volatile.HeartbeatElapsed = 0
+
+	return r, nil
+}
+
 // Tick advances simulated time by one logical tick.
 func (r *Raft) Tick() {
 	if r.volatile.Role == Leader {
@@ -129,11 +216,13 @@ func (r *Raft) Ready() Ready {
 		Messages: make([]Message, len(r.messages)),
 	}
 
+	// Copy outgoing messages.
 	for i, msg := range r.messages {
 		rd.Messages[i] = msg
 		rd.Messages[i].Entries = cloneEntries(msg.Entries)
 	}
 
+	// Expose changed persistent metadata.
 	if r.hard != r.stableHard {
 		hs := r.hard
 		rd.HardState = &hs
@@ -168,8 +257,8 @@ func (r *Raft) Ready() Ready {
 		rd.Entries = cloneEntries(r.log[common:])
 	}
 
-	// Expose committed entries not yet acknowledged
-	// as applied.
+	// Expose committed entries that have not yet
+	// been acknowledged as applied.
 	if r.volatile.AppliedIndex < r.hard.Commit {
 		for _, entry := range r.log {
 			if entry.Index > r.volatile.AppliedIndex &&
@@ -187,8 +276,9 @@ func (r *Raft) Ready() Ready {
 
 // Advance acknowledges all current Ready work.
 //
-// A durable driver must persist required state and apply
-// committed entries successfully before calling Advance().
+// A durable driver must persist the required state
+// and apply committed entries successfully before
+// calling Advance().
 func (r *Raft) Advance() {
 	r.stableHard = r.hard
 	r.stableLog = cloneEntries(r.log)
@@ -197,6 +287,7 @@ func (r *Raft) Advance() {
 	r.messages = nil
 }
 
+// Status returns the node's consensus status.
 func (r *Raft) Status() Status {
 	return Status{
 		ID:       r.id,
@@ -207,10 +298,12 @@ func (r *Raft) Status() Status {
 	}
 }
 
+// majority returns the quorum size.
 func (r *Raft) majority() int {
 	return (len(r.peers)+1)/2 + 1
 }
 
+// sendHeartbeats sends heartbeats to followers.
 func (r *Raft) sendHeartbeats() {
 	for _, peer := range r.peers {
 		matchIndex := r.matchIndex[peer]
