@@ -39,8 +39,17 @@ type record struct {
 	Snapshot  *raft.SnapshotMetadata `json:"snapshot,omitempty"`
 }
 
+// walFile supports deterministic I/O failure injection in tests.
+type walFile interface {
+	io.Reader
+	io.Writer
+	io.Seeker
+	Sync() error
+	Close() error
+}
+
 type WAL struct {
-	file      *os.File
+	file      walFile
 	state     raft.PersistentState
 	recovered bool
 	unusable  bool
