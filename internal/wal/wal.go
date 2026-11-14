@@ -19,6 +19,7 @@ const (
 	recordReplace    = 3
 	recordTruncate   = 4
 	recordCompaction = 5
+	recordCheckpoint = 6
 
 	headerSize = 8
 	maxRecord  = 64 << 20
@@ -37,6 +38,7 @@ type record struct {
 	Entries   []raft.Entry           `json:"entries,omitempty"`
 	HardState *raft.HardState        `json:"hard_state,omitempty"`
 	Snapshot  *raft.SnapshotMetadata `json:"snapshot,omitempty"`
+	State     *raft.PersistentState  `json:"state,omitempty"`
 }
 
 // walFile supports deterministic I/O failure injection in tests.
@@ -50,6 +52,7 @@ type walFile interface {
 
 type WAL struct {
 	file      walFile
+	path      string
 	state     raft.PersistentState
 	recovered bool
 	unusable  bool
@@ -74,6 +77,7 @@ func Open(path string) (*WAL, error) {
 
 	return &WAL{
 		file:      f,
+		path:      path,
 		recovered: info.Size() == 0,
 	}, nil
 }
@@ -321,7 +325,68 @@ func apply(
 
 			next.Snapshot = *r.Snapshot
 		}
+	case recordCheckpoint:
+		if r.State == nil {
+			return current, fmt.Errorf(
+				"%w: missing checkpoint state",
+				ErrInvalid,
+			)
+		}
 
+		if current.HardState != (raft.HardState{}) ||
+			len(current.Log) != 0 ||
+			current.Snapshot.LastIncludedIndex != 0 {
+			return current, fmt.Errorf(
+				"%w: checkpoint must be first record",
+				ErrInvalid,
+			)
+		}
+
+		checkpoint := copyState(*r.State)
+
+		if checkpoint.Snapshot.LastIncludedIndex == 0 &&
+			checkpoint.Snapshot.LastIncludedTerm != 0 {
+			return current, fmt.Errorf(
+				"%w: invalid checkpoint snapshot",
+				ErrInvalid,
+			)
+		}
+
+		if checkpoint.Snapshot.LastIncludedIndex > 0 &&
+			checkpoint.Snapshot.LastIncludedTerm == 0 {
+			return current, fmt.Errorf(
+				"%w: invalid checkpoint snapshot term",
+				ErrInvalid,
+			)
+		}
+
+		if checkpoint.HardState.Commit >
+			lastIndex(checkpoint) {
+			return current, fmt.Errorf(
+				"%w: checkpoint commit exceeds log",
+				ErrInvalid,
+			)
+		}
+
+		previousTerm := checkpoint.Snapshot.LastIncludedTerm
+
+		for i, entry := range checkpoint.Log {
+			expected := checkpoint.Snapshot.LastIncludedIndex +
+				uint64(i) + 1
+
+			if entry.Index != expected ||
+				entry.Term == 0 ||
+				entry.Term < previousTerm {
+				return current, fmt.Errorf(
+					"%w: invalid checkpoint log entry",
+					ErrInvalid,
+				)
+			}
+
+			previousTerm = entry.Term
+		}
+
+		return checkpoint, nil
 	default:
 		return current, fmt.Errorf(
 			"%w: unknown record type", ErrInvalid,

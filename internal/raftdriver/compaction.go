@@ -40,8 +40,8 @@ func (d *Driver) CompactKV(
 
 // compactKVWith is the internal compaction workflow.
 //
-// The compact function is injectable so tests can
-// simulate failures at the WAL compaction stage.
+// The compact callback is injectable so tests can
+// simulate failures during logical WAL compaction.
 func (d *Driver) compactKVWith(
 	node *raft.Raft,
 	storage *wal.WAL,
@@ -71,7 +71,7 @@ func (d *Driver) compactKVWith(
 		)
 	}
 
-	// Drain pending Raft work.
+	// Phase 1: Persist and apply all pending Raft work.
 	if err := d.Process(); err != nil {
 		return err
 	}
@@ -89,6 +89,7 @@ func (d *Driver) compactKVWith(
 	}
 
 	term, ok := node.TermAt(index)
+
 	if !ok || term == 0 {
 		return errors.New(
 			"cannot determine snapshot boundary term",
@@ -103,10 +104,23 @@ func (d *Driver) compactKVWith(
 		)
 	}
 
+	// Nothing new has been applied since the
+	// previous snapshot.
 	if index == base.LastIncludedIndex {
 		return nil
 	}
 
+	// Determine the WAL path before changing any
+	// durable snapshot or compaction state.
+	walPath, err := storage.Path()
+	if err != nil {
+		return d.stop(fmt.Errorf(
+			"determine WAL path: %w",
+			err,
+		))
+	}
+
+	// Phase 2: Capture the KV state.
 	data := store.Snapshot()
 
 	if store.AppliedIndex() != index {
@@ -117,18 +131,21 @@ func (d *Driver) compactKVWith(
 
 	s := snapshot.New(index, term, data)
 
-	// Phase 1: Save the KV snapshot.
+	// Save the snapshot atomically.
 	if err := snapshot.Save(snapshotPath, s); err != nil {
 		return d.stop(fmt.Errorf(
-			"save KV snapshot: %w", err,
+			"save KV snapshot: %w",
+			err,
 		))
 	}
 
-	// Phase 2: Verify the saved snapshot.
+	// Read the snapshot back to verify its
+	// persisted metadata and contents.
 	verified, err := snapshot.Load(snapshotPath)
 	if err != nil {
 		return d.stop(fmt.Errorf(
-			"verify KV snapshot: %w", err,
+			"verify KV snapshot: %w",
+			err,
 		))
 	}
 
@@ -139,18 +156,41 @@ func (d *Driver) compactKVWith(
 		))
 	}
 
-	// Phase 3: Compact the WAL.
-	// Tests can inject a failure here.
+	// Phase 3: Logically compact the WAL.
+	//
+	// This durably records the new snapshot boundary
+	// while retaining the historical WAL records.
 	if err := compact(index, term); err != nil {
 		return d.stop(fmt.Errorf(
-			"compact WAL prefix: %w", err,
+			"compact WAL prefix: %w",
+			err,
 		))
 	}
 
 	// Phase 4: Compact the in-memory Raft log.
 	if err := node.CompactPrefix(index, term); err != nil {
 		return d.stop(fmt.Errorf(
-			"compact in-memory Raft log: %w", err,
+			"compact in-memory Raft log: %w",
+			err,
+		))
+	}
+
+	// Phase 5: Physically compact the WAL.
+	//
+	// Rewrite the WAL into a checkpoint containing:
+	//   - Current hard state
+	//   - Snapshot boundary metadata
+	//   - Remaining Raft log entries
+	//
+	// The rewrite uses a temporary file, fsync,
+	// atomic rename, and directory synchronization.
+	//
+	// Failure requires stopping the driver and
+	// recovering from the durable on-disk state.
+	if err := storage.RewriteCheckpoint(walPath); err != nil {
+		return d.stop(fmt.Errorf(
+			"physically compact WAL: %w",
+			err,
 		))
 	}
 
