@@ -16,6 +16,9 @@ type Raft struct {
 	volatile VolatileState
 	log      []Entry
 
+	snapshotIndex uint64
+	snapshotTerm  uint64
+
 	votes    map[NodeID]bool
 	messages []Message
 
@@ -27,14 +30,12 @@ type Raft struct {
 	nextRequestID uint64
 	pendingAppend map[NodeID]map[uint64]uint64
 
-	// State acknowledged by Advance().
 	stableHard HardState
 	stableLog  []Entry
 }
 
 var _ Consensus = (*Raft)(nil)
 
-// NewRaft creates a Raft node with a deterministic timeout.
 func NewRaft(
 	id NodeID,
 	peers []NodeID,
@@ -60,53 +61,61 @@ func NewRaft(
 	return r
 }
 
-// NewRaftFromState restores a Raft node from persisted state.
-//
-// A recovered node always starts as a follower.
-// Persisted entries and HardState are marked stable.
-//
-// Committed entries remain available for replay into
-// the application state machine.
 func NewRaftFromState(
 	id NodeID,
 	peers []NodeID,
 	electionTimeout int,
 	state PersistentState,
 ) (*Raft, error) {
-	// Validate the recovered commit index.
-	if state.HardState.Commit > uint64(len(state.Log)) {
+	if electionTimeout <= 0 {
+		return nil, errors.New("election timeout must be positive")
+	}
+
+	base := state.Snapshot.LastIncludedIndex
+	baseTerm := state.Snapshot.LastIncludedTerm
+
+	if (base == 0) != (baseTerm == 0) {
+		return nil, errors.New("invalid snapshot boundary")
+	}
+
+	last := base + uint64(len(state.Log))
+	if last < base {
+		return nil, errors.New("recovered log index overflow")
+	}
+
+	if state.HardState.Commit < base ||
+		state.HardState.Commit > last {
 		return nil, errors.New(
-			"recovered commit index exceeds log length",
+			"recovered commit index outside log bounds",
 		)
 	}
 
-	// A vote cannot exist without an election term.
-	if state.HardState.Term == 0 &&
-		state.HardState.Vote != 0 {
+	if state.HardState.Term == 0 && state.HardState.Vote != 0 {
 		return nil, errors.New(
 			"recovered vote exists without a term",
 		)
 	}
 
-	// Validate recovered log indexes and terms.
-	for i, entry := range state.Log {
-		expectedIndex := uint64(i + 1)
+	if baseTerm > state.HardState.Term {
+		return nil, errors.New(
+			"snapshot term exceeds current term",
+		)
+	}
 
-		if entry.Index != expectedIndex {
+	previousTerm := baseTerm
+
+	for i, entry := range state.Log {
+		expected := base + uint64(i) + 1
+
+		if entry.Index != expected {
 			return nil, errors.New(
 				"recovered log contains invalid index",
 			)
 		}
 
-		if entry.Term == 0 {
+		if entry.Term == 0 || entry.Term < previousTerm {
 			return nil, errors.New(
-				"recovered log contains zero term",
-			)
-		}
-
-		if i > 0 && entry.Term < state.Log[i-1].Term {
-			return nil, errors.New(
-				"recovered log contains decreasing terms",
+				"recovered log contains invalid term",
 			)
 		}
 
@@ -115,39 +124,29 @@ func NewRaftFromState(
 				"recovered log term exceeds current term",
 			)
 		}
+
+		previousTerm = entry.Term
 	}
 
-	// Construct a fresh Raft node.
 	r := NewRaft(id, peers, electionTimeout)
 
-	// Restore persistent metadata.
-	r.hard = state.HardState
+	r.snapshotIndex = base
+	r.snapshotTerm = baseTerm
 
-	// Deep-copy recovered log entries.
+	r.hard = state.HardState
 	r.log = cloneEntries(state.Log)
 
-	// Recovered state is already persisted.
 	r.stableHard = state.HardState
 	r.stableLog = cloneEntries(state.Log)
 
-	// Always restart as follower.
 	r.volatile.Role = Follower
 	r.volatile.LeaderID = 0
-
-	// Restore the commit index.
 	r.volatile.CommitIndex = state.HardState.Commit
-
-	// Replay committed entries before normal operation.
-	r.volatile.AppliedIndex = 0
-
-	// Reset election and heartbeat timers.
-	r.volatile.ElectionElapsed = 0
-	r.volatile.HeartbeatElapsed = 0
+	r.volatile.AppliedIndex = base
 
 	return r, nil
 }
 
-// Tick advances simulated time by one logical tick.
 func (r *Raft) Tick() {
 	if r.volatile.Role == Leader {
 		r.volatile.HeartbeatElapsed++
@@ -166,7 +165,6 @@ func (r *Raft) Tick() {
 	}
 }
 
-// Step processes an incoming Raft message.
 func (r *Raft) Step(msg Message) error {
 	if msg.To != r.id {
 		return errors.New("message addressed to another node")
@@ -193,7 +191,6 @@ func (r *Raft) Step(msg Message) error {
 	return nil
 }
 
-// Propose appends a command to the leader's log.
 func (r *Raft) Propose(data []byte) error {
 	if r.volatile.Role != Leader {
 		return ErrNotLeader
@@ -210,26 +207,22 @@ func (r *Raft) ReadIndex(ctx []byte) error {
 	return ErrNotImplemented
 }
 
-// Ready exposes pending messages and persistence work.
+// Ready reports changes using absolute Raft indexes.
 func (r *Raft) Ready() Ready {
 	rd := Ready{
 		Messages: make([]Message, len(r.messages)),
 	}
 
-	// Copy outgoing messages.
 	for i, msg := range r.messages {
 		rd.Messages[i] = msg
 		rd.Messages[i].Entries = cloneEntries(msg.Entries)
 	}
 
-	// Expose changed persistent metadata.
 	if r.hard != r.stableHard {
 		hs := r.hard
 		rd.HardState = &hs
 	}
 
-	// Determine the common prefix of the current log
-	// and the last acknowledged log.
 	common := 0
 
 	for common < len(r.log) &&
@@ -247,38 +240,31 @@ func (r *Raft) Ready() Ready {
 		common++
 	}
 
-	// Detect a replaced or removed persisted suffix.
+	// Absolute index, not slice-relative index.
 	if common < len(r.stableLog) {
-		rd.TruncateFrom = uint64(common) + 1
+		rd.TruncateFrom = r.snapshotIndex +
+			uint64(common) + 1
 	}
 
-	// Include new or replacement entries.
 	if common < len(r.log) {
 		rd.Entries = cloneEntries(r.log[common:])
 	}
 
-	// Expose committed entries that have not yet
-	// been acknowledged as applied.
-	if r.volatile.AppliedIndex < r.hard.Commit {
-		for _, entry := range r.log {
-			if entry.Index > r.volatile.AppliedIndex &&
-				entry.Index <= r.hard.Commit {
-				rd.CommittedEntries = append(
-					rd.CommittedEntries,
-					cloneEntries([]Entry{entry})...,
-				)
-			}
+	// Replay only entries after the applied index.
+	// Snapshot-covered entries are not present in r.log.
+	for _, entry := range r.log {
+		if entry.Index > r.volatile.AppliedIndex &&
+			entry.Index <= r.hard.Commit {
+			rd.CommittedEntries = append(
+				rd.CommittedEntries,
+				cloneEntries([]Entry{entry})...,
+			)
 		}
 	}
 
 	return rd
 }
 
-// Advance acknowledges all current Ready work.
-//
-// A durable driver must persist the required state
-// and apply committed entries successfully before
-// calling Advance().
 func (r *Raft) Advance() {
 	r.stableHard = r.hard
 	r.stableLog = cloneEntries(r.log)
@@ -287,7 +273,6 @@ func (r *Raft) Advance() {
 	r.messages = nil
 }
 
-// Status returns the node's consensus status.
 func (r *Raft) Status() Status {
 	return Status{
 		ID:       r.id,
@@ -298,12 +283,10 @@ func (r *Raft) Status() Status {
 	}
 }
 
-// majority returns the quorum size.
 func (r *Raft) majority() int {
 	return (len(r.peers)+1)/2 + 1
 }
 
-// sendHeartbeats sends heartbeats to followers.
 func (r *Raft) sendHeartbeats() {
 	for _, peer := range r.peers {
 		matchIndex := r.matchIndex[peer]
@@ -320,7 +303,62 @@ func (r *Raft) sendHeartbeats() {
 	}
 }
 
-// cloneEntries deep-copies entries and their payloads.
+func (r *Raft) lastIndex() uint64 {
+	if len(r.log) == 0 {
+		return r.snapshotIndex
+	}
+
+	return r.log[len(r.log)-1].Index
+}
+
+func (r *Raft) firstIndex() uint64 {
+	return r.snapshotIndex + 1
+}
+
+func (r *Raft) logOffset(index uint64) (int, bool) {
+	if index <= r.snapshotIndex ||
+		index > r.lastIndex() {
+		return 0, false
+	}
+
+	return int(index - r.snapshotIndex - 1), true
+}
+
+func (r *Raft) entryAt(index uint64) (Entry, bool) {
+	offset, ok := r.logOffset(index)
+	if !ok {
+		return Entry{}, false
+	}
+
+	return r.log[offset], true
+}
+
+// SnapshotMetadata returns the recovered snapshot boundary.
+func (r *Raft) SnapshotMetadata() SnapshotMetadata {
+	return SnapshotMetadata{
+		LastIncludedIndex: r.snapshotIndex,
+		LastIncludedTerm:  r.snapshotTerm,
+	}
+}
+
+// TermAt returns the term of an available log index
+// or the snapshot boundary. Older terms are unavailable.
+func (r *Raft) TermAt(index uint64) (uint64, bool) {
+	if index == r.snapshotIndex {
+		if index == 0 {
+			return 0, true
+		}
+		return r.snapshotTerm, true
+	}
+
+	entry, ok := r.entryAt(index)
+	if !ok {
+		return 0, false
+	}
+
+	return entry.Term, true
+}
+
 func cloneEntries(entries []Entry) []Entry {
 	if len(entries) == 0 {
 		return nil

@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	recordEntries   = 1
-	recordHardState = 2
-	recordReplace   = 3
-	recordTruncate  = 4
+	recordEntries    = 1
+	recordHardState  = 2
+	recordReplace    = 3
+	recordTruncate   = 4
+	recordCompaction = 5
 
 	headerSize = 8
 	maxRecord  = 64 << 20
@@ -31,10 +32,11 @@ var (
 )
 
 type record struct {
-	Type      uint8           `json:"type"`
-	FromIndex uint64          `json:"from_index,omitempty"`
-	Entries   []raft.Entry    `json:"entries,omitempty"`
-	HardState *raft.HardState `json:"hard_state,omitempty"`
+	Type      uint8                  `json:"type"`
+	FromIndex uint64                 `json:"from_index,omitempty"`
+	Entries   []raft.Entry           `json:"entries,omitempty"`
+	HardState *raft.HardState        `json:"hard_state,omitempty"`
+	Snapshot  *raft.SnapshotMetadata `json:"snapshot,omitempty"`
 }
 
 type WAL struct {
@@ -82,7 +84,13 @@ func copyState(s raft.PersistentState) raft.PersistentState {
 	return raft.PersistentState{
 		HardState: s.HardState,
 		Log:       copyEntries(s.Log),
+		Snapshot:  s.Snapshot,
 	}
+}
+
+func lastIndex(state raft.PersistentState) uint64 {
+	return state.Snapshot.LastIncludedIndex +
+		uint64(len(state.Log))
 }
 
 func apply(
@@ -92,6 +100,7 @@ func apply(
 	next := copyState(current)
 
 	switch r.Type {
+
 	case recordEntries:
 		if len(r.Entries) == 0 {
 			return current, fmt.Errorf(
@@ -100,7 +109,7 @@ func apply(
 		}
 
 		for _, entry := range r.Entries {
-			expected := uint64(len(next.Log)) + 1
+			expected := lastIndex(next) + 1
 
 			if entry.Index != expected || entry.Term == 0 {
 				return current, fmt.Errorf(
@@ -109,8 +118,13 @@ func apply(
 				)
 			}
 
-			if len(next.Log) > 0 &&
-				entry.Term < next.Log[len(next.Log)-1].Term {
+			previousTerm := next.Snapshot.LastIncludedTerm
+
+			if len(next.Log) > 0 {
+				previousTerm = next.Log[len(next.Log)-1].Term
+			}
+
+			if entry.Term < previousTerm {
 				return current, fmt.Errorf(
 					"%w: log term regression", ErrInvalid,
 				)
@@ -123,9 +137,18 @@ func apply(
 		}
 
 	case recordReplace:
+		base := next.Snapshot.LastIncludedIndex
+
 		if r.FromIndex == 0 || len(r.Entries) == 0 {
 			return current, fmt.Errorf(
 				"%w: invalid replacement", ErrInvalid,
+			)
+		}
+
+		if r.FromIndex <= base {
+			return current, fmt.Errorf(
+				"%w: cannot replace compacted prefix",
+				ErrInvalid,
 			)
 		}
 
@@ -136,17 +159,18 @@ func apply(
 			)
 		}
 
-		if r.FromIndex > uint64(len(next.Log))+1 {
+		if r.FromIndex > lastIndex(next)+1 {
 			return current, fmt.Errorf(
 				"%w: replacement creates a gap",
 				ErrInvalid,
 			)
 		}
 
-		next.Log = next.Log[:r.FromIndex-1]
+		offset := r.FromIndex - base - 1
+		next.Log = next.Log[:int(offset)]
 
 		for _, entry := range r.Entries {
-			expected := uint64(len(next.Log)) + 1
+			expected := lastIndex(next) + 1
 
 			if entry.Index != expected || entry.Term == 0 {
 				return current, fmt.Errorf(
@@ -155,8 +179,13 @@ func apply(
 				)
 			}
 
-			if len(next.Log) > 0 &&
-				entry.Term < next.Log[len(next.Log)-1].Term {
+			previousTerm := next.Snapshot.LastIncludedTerm
+
+			if len(next.Log) > 0 {
+				previousTerm = next.Log[len(next.Log)-1].Term
+			}
+
+			if entry.Term < previousTerm {
 				return current, fmt.Errorf(
 					"%w: replacement term regression",
 					ErrInvalid,
@@ -170,9 +199,18 @@ func apply(
 		}
 
 	case recordTruncate:
+		base := next.Snapshot.LastIncludedIndex
+
 		if r.FromIndex == 0 {
 			return current, fmt.Errorf(
 				"%w: invalid truncation index",
+				ErrInvalid,
+			)
+		}
+
+		if r.FromIndex <= base {
+			return current, fmt.Errorf(
+				"%w: cannot truncate compacted prefix",
 				ErrInvalid,
 			)
 		}
@@ -184,7 +222,7 @@ func apply(
 			)
 		}
 
-		if r.FromIndex > uint64(len(next.Log))+1 {
+		if r.FromIndex > lastIndex(next)+1 {
 			return current, fmt.Errorf(
 				"%w: truncation index exceeds log",
 				ErrInvalid,
@@ -198,7 +236,8 @@ func apply(
 			)
 		}
 
-		next.Log = next.Log[:r.FromIndex-1]
+		offset := r.FromIndex - base - 1
+		next.Log = next.Log[:int(offset)]
 
 	case recordHardState:
 		if r.HardState == nil {
@@ -222,7 +261,7 @@ func apply(
 			)
 		}
 
-		if hs.Commit > uint64(len(next.Log)) {
+		if hs.Commit > lastIndex(next) {
 			return current, fmt.Errorf(
 				"%w: commit exceeds log", ErrInvalid,
 			)
@@ -245,6 +284,35 @@ func apply(
 
 		next.HardState = hs
 
+	case recordCompaction:
+		if r.Snapshot == nil {
+			return current, fmt.Errorf(
+				"%w: missing snapshot metadata",
+				ErrInvalid,
+			)
+		}
+
+		index := r.Snapshot.LastIncludedIndex
+		term := r.Snapshot.LastIncludedTerm
+
+		if err := ValidateCompaction(
+			next, index, term,
+		); err != nil {
+			return current, err
+		}
+
+		base := next.Snapshot.LastIncludedIndex
+
+		if index > base {
+			removeCount := index - base
+
+			next.Log = copyEntries(
+				next.Log[int(removeCount):],
+			)
+
+			next.Snapshot = *r.Snapshot
+		}
+
 	default:
 		return current, fmt.Errorf(
 			"%w: unknown record type", ErrInvalid,
@@ -258,9 +326,11 @@ func (w *WAL) checkWritable() error {
 	if w.closed || w.unusable {
 		return ErrUnusable
 	}
+
 	if !w.recovered {
 		return ErrNotRecovered
 	}
+
 	return nil
 }
 
@@ -360,11 +430,27 @@ func (w *WAL) ReplaceEntries(
 	})
 }
 
-// TruncateSuffix durably removes an uncommitted log suffix.
+// TruncateSuffix durably removes an uncommitted suffix.
 func (w *WAL) TruncateSuffix(fromIndex uint64) error {
 	return w.writeRecord(record{
 		Type:      recordTruncate,
 		FromIndex: fromIndex,
+	})
+}
+
+// CompactPrefix durably records a snapshot boundary.
+//
+// The caller must first persist and verify a matching
+// KV snapshot. This operation performs logical
+// compaction only; the WAL file is not physically
+// rewritten or shortened.
+func (w *WAL) CompactPrefix(index, term uint64) error {
+	return w.writeRecord(record{
+		Type: recordCompaction,
+		Snapshot: &raft.SnapshotMetadata{
+			LastIncludedIndex: index,
+			LastIncludedTerm:  term,
+		},
 	})
 }
 

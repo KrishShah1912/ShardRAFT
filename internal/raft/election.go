@@ -24,7 +24,6 @@ func (r *Raft) startElection() {
 		r.id: true,
 	}
 
-	// A single-node cluster already has a majority.
 	if len(r.votes) >= r.majority() {
 		r.becomeLeader()
 		return
@@ -49,31 +48,21 @@ func (r *Raft) becomeLeader() {
 	r.volatile.LeaderID = r.id
 	r.volatile.HeartbeatElapsed = 0
 
-	// Initialize follower replication positions.
-	lastIndex := uint64(len(r.log))
+	lastIndex := r.lastIndex()
 
 	for _, peer := range r.peers {
 		r.nextIndex[peer] = lastIndex + 1
 		r.matchIndex[peer] = 0
 	}
 
-	// Append a no-op entry in the new leader's term.
 	r.appendEntry(nil, EntryNoop)
-
-	// Replicate the no-op to followers.
 	r.replicate()
-
-	// A single-node cluster can commit immediately.
 	r.maybeCommit()
 }
 
 func (r *Raft) lastLogInfo() (uint64, uint64) {
-	if len(r.log) == 0 {
-		return 0, 0
-	}
-
-	last := r.log[len(r.log)-1]
-	return last.Index, last.Term
+	lastIndex := r.lastIndex()
+	return lastIndex, r.termAt(lastIndex)
 }
 
 func (r *Raft) handleVoteRequest(msg Message) {
@@ -124,24 +113,24 @@ func (r *Raft) handleAppend(msg Message) {
 		return
 	}
 
-	// Reject heartbeats from older terms.
 	if msg.Term < r.hard.Term {
 		return
 	}
 
 	r.becomeFollower(msg.Term, msg.From)
 
-	// Verify that the follower has the same log
-	// entry at the index confirmed by the leader.
-	if msg.Index > uint64(len(r.log)) ||
+	// A compacted follower cannot verify entries
+	// preceding its snapshot boundary.
+	if msg.Index < r.snapshotIndex {
+		return
+	}
+
+	if msg.Index > r.lastIndex() ||
 		r.termAt(msg.Index) != msg.LogTerm {
 		return
 	}
 
-	// A heartbeat can only commit entries through
-	// the verified matching log position.
 	newCommit := msg.Commit
-
 	if newCommit > msg.Index {
 		newCommit = msg.Index
 	}

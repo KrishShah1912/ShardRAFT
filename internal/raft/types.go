@@ -64,10 +64,21 @@ type HardState struct {
 	Commit uint64
 }
 
+// SnapshotMetadata identifies the last Raft entry
+// included in a durable snapshot.
+type SnapshotMetadata struct {
+	LastIncludedIndex uint64
+	LastIncludedTerm  uint64
+}
+
 // PersistentState survives restarts.
 type PersistentState struct {
 	HardState HardState
 	Log       []Entry
+
+	// Zero values indicate that no log prefix
+	// has been compacted.
+	Snapshot SnapshotMetadata
 }
 
 // VolatileState is reconstructed after restart.

@@ -11,13 +11,14 @@ import (
 	"github.com/KrishShah1912/shardraft/internal/wal"
 )
 
-// RecoverKVDriver restores Raft from the WAL and,
-// when present, restores the KV store from a snapshot.
+// RecoverKVDriver restores Raft and KV state.
 //
-// The caller must call driver.Process() successfully
-// before allowing new Raft activity.
+// A compacted WAL requires a snapshot at or ahead
+// of its compacted boundary. A newer snapshot is
+// accepted only when its index and term match the
+// recovered Raft history.
 //
-// The caller owns the returned WAL and must close it.
+// Call driver.Process() before new Raft activity.
 func RecoverKVDriver(
 	walPath string,
 	snapshotPath string,
@@ -42,53 +43,74 @@ func RecoverKVDriver(
 	fail := func(err error) (
 		*raft.Raft, *wal.WAL, *Driver, *kvstore.Store, error,
 	) {
-		storage.Close()
+		_ = storage.Close()
 		return nil, nil, nil, nil, err
 	}
 
 	store := kvstore.New()
+	base := node.SnapshotMetadata()
 
-	s, err := snapshot.Load(snapshotPath)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fail(fmt.Errorf("load snapshot: %w", err))
-	}
+	s, loadErr := snapshot.Load(snapshotPath)
 
-	if err == nil {
-		// Ready contains all committed entries on recovery
-		// because the restored Raft applied index is zero.
-		committed := node.Ready().CommittedEntries
+	if loadErr != nil {
+		if !errors.Is(loadErr, os.ErrNotExist) {
+			return fail(fmt.Errorf(
+				"load snapshot: %w", loadErr,
+			))
+		}
 
+		if base.LastIncludedIndex != 0 {
+			return fail(errors.New(
+				"compacted WAL requires a matching snapshot",
+			))
+		}
+	} else {
 		if s.AppliedIndex > node.Status().Commit {
 			return fail(errors.New(
 				"snapshot index exceeds Raft commit index",
 			))
 		}
 
-		if s.AppliedIndex > 0 {
-			// Current implementation retains the full log,
-			// so the snapshot boundary must be present.
-			if s.AppliedIndex > uint64(len(committed)) {
+		if base.LastIncludedIndex != 0 {
+			if s.AppliedIndex < base.LastIncludedIndex {
 				return fail(errors.New(
-					"snapshot boundary missing from WAL",
+					"snapshot is older than compacted WAL boundary",
 				))
 			}
 
-			boundary := committed[s.AppliedIndex-1]
+			if s.AppliedIndex == base.LastIncludedIndex &&
+				s.AppliedTerm != base.LastIncludedTerm {
+				return fail(errors.New(
+					"snapshot does not match compacted WAL boundary",
+				))
+			}
+		}
 
-			if boundary.Index != s.AppliedIndex ||
-				boundary.Term != s.AppliedTerm {
+		if s.AppliedIndex > 0 {
+			term, ok := node.TermAt(s.AppliedIndex)
+
+			if !ok || term != s.AppliedTerm {
 				return fail(errors.New(
 					"snapshot index/term does not match WAL",
 				))
 			}
 		}
 
-		if err := store.Restore(s.AppliedIndex, s.Data); err != nil {
-			return fail(fmt.Errorf("restore KV state: %w", err))
+		if err := store.Restore(
+			s.AppliedIndex, s.Data,
+		); err != nil {
+			return fail(fmt.Errorf(
+				"restore KV state: %w", err,
+			))
 		}
 	}
 
-	driver, err := New(node, storage, store.Apply, send)
+	driver, err := New(
+		node,
+		storage,
+		store.Apply,
+		send,
+	)
 	if err != nil {
 		return fail(err)
 	}
