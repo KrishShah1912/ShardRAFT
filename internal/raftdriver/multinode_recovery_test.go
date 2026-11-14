@@ -23,6 +23,7 @@ type recoveryTestCluster struct {
 	ids      []raft.NodeID
 	nodes    map[raft.NodeID]*recoveryTestNode
 	online   map[raft.NodeID]bool
+	blocked  map[raft.NodeID]bool
 	messages []raft.Message
 }
 
@@ -30,11 +31,12 @@ func newRecoveryTestCluster(t *testing.T) *recoveryTestCluster {
 	t.Helper()
 
 	c := &recoveryTestCluster{
-		t:      t,
-		dir:    t.TempDir(),
-		ids:    []raft.NodeID{1, 2, 3},
-		nodes:  make(map[raft.NodeID]*recoveryTestNode),
-		online: make(map[raft.NodeID]bool),
+		t:       t,
+		dir:     t.TempDir(),
+		ids:     []raft.NodeID{1, 2, 3},
+		nodes:   make(map[raft.NodeID]*recoveryTestNode),
+		online:  make(map[raft.NodeID]bool),
+		blocked: make(map[raft.NodeID]bool),
 	}
 
 	for _, id := range c.ids {
@@ -90,8 +92,8 @@ func (c *recoveryTestCluster) start(id raft.NodeID) {
 
 	c.online[id] = true
 
-	// Recovery replay must finish before the node
-	// participates in the network.
+	// Replay committed entries before allowing
+	// the recovered node to receive messages.
 	if err := driver.Process(); err != nil {
 		c.t.Fatal(err)
 	}
@@ -110,7 +112,7 @@ func (c *recoveryTestCluster) crash(id raft.NodeID) {
 		c.t.Fatal(err)
 	}
 
-	// Remove any messages queued by the crashed node.
+	// Drop messages associated with the crashed node.
 	var remaining []raft.Message
 
 	for _, msg := range c.messages {
@@ -133,13 +135,14 @@ func (c *recoveryTestCluster) restart(id raft.NodeID) {
 
 	if c.nodes[id].node.Status().Role != raft.Follower {
 		c.t.Fatalf(
-			"node %d did not recover as follower", id,
+			"node %d did not recover as follower",
+			id,
 		)
 	}
 }
 
-// Process all online nodes before delivering messages.
-// Repeat until no new messages remain.
+// Process every online node before delivering messages.
+// Repeat until the network becomes idle.
 func (c *recoveryTestCluster) deliver() {
 	c.t.Helper()
 
@@ -151,7 +154,9 @@ func (c *recoveryTestCluster) deliver() {
 
 			if err := c.nodes[id].driver.Process(); err != nil {
 				c.t.Fatalf(
-					"process node %d: %v", id, err,
+					"process node %d: %v",
+					id,
+					err,
 				)
 			}
 		}
@@ -168,10 +173,17 @@ func (c *recoveryTestCluster) deliver() {
 				continue
 			}
 
+			// Simulate bidirectional network isolation.
+			if c.blocked[msg.From] || c.blocked[msg.To] {
+				continue
+			}
+
 			if err := c.nodes[msg.To].node.Step(msg); err != nil {
 				c.t.Fatalf(
 					"message %d -> %d: %v",
-					msg.From, msg.To, err,
+					msg.From,
+					msg.To,
+					err,
 				)
 			}
 		}
@@ -200,13 +212,13 @@ func (c *recoveryTestCluster) leader() raft.NodeID {
 	var leader raft.NodeID
 
 	for _, id := range c.ids {
-		if !c.online[id] {
+		if !c.online[id] || c.blocked[id] {
 			continue
 		}
 
 		if c.nodes[id].node.Status().Role == raft.Leader {
 			if leader != 0 {
-				c.t.Fatal("multiple online leaders")
+				c.t.Fatal("multiple connected leaders")
 			}
 
 			leader = id
@@ -241,7 +253,7 @@ func (c *recoveryTestCluster) propose(
 
 	c.deliver()
 
-	// Propagate the committed index via heartbeats.
+	// Propagate the updated commit index.
 	c.advance(2)
 }
 
@@ -255,8 +267,12 @@ func (c *recoveryTestCluster) check(
 
 	if !exists || value != expected {
 		c.t.Fatalf(
-			"node %d: %s expected %q, got %q (exists=%v)",
-			id, key, expected, value, exists,
+			"node %d: key %q expected %q, got %q (exists=%v)",
+			id,
+			key,
+			expected,
+			value,
+			exists,
 		)
 	}
 }
@@ -294,7 +310,9 @@ func (c *recoveryTestCluster) checkIndexes() {
 		if applied != commit {
 			c.t.Fatalf(
 				"node %d: applied=%d, commit=%d",
-				id, applied, commit,
+				id,
+				applied,
+				commit,
 			)
 		}
 
@@ -304,12 +322,15 @@ func (c *recoveryTestCluster) checkIndexes() {
 		} else if commit != expected {
 			c.t.Fatalf(
 				"node %d: commit=%d, expected=%d",
-				id, commit, expected,
+				id,
+				commit,
+				expected,
 			)
 		}
 	}
 }
 
+// TEST 1: Follower crash and recovery.
 func TestThreeNodeFollowerCrashAndRecovery(t *testing.T) {
 	c := newRecoveryTestCluster(t)
 
@@ -323,7 +344,9 @@ func TestThreeNodeFollowerCrashAndRecovery(t *testing.T) {
 	t.Logf("initial leader: node %d", leader)
 
 	c.propose(leader, "alpha", "10")
-	c.checkAll(map[string]string{"alpha": "10"})
+	c.checkAll(map[string]string{
+		"alpha": "10",
+	})
 
 	var follower raft.NodeID
 
@@ -342,8 +365,6 @@ func TestThreeNodeFollowerCrashAndRecovery(t *testing.T) {
 	c.restart(follower)
 	c.check(follower, "alpha", "10")
 
-	// A new proposal triggers replication to the
-	// recovered follower.
 	c.propose(leader, "gamma", "30")
 	c.advance(4)
 
@@ -352,15 +373,16 @@ func TestThreeNodeFollowerCrashAndRecovery(t *testing.T) {
 		"beta":  "20",
 		"gamma": "30",
 	})
+
 	c.checkIndexes()
 
 	t.Log("three-node follower recovery verified")
 }
 
+// TEST 2: Leader crash, re-election, and recovery.
 func TestThreeNodeLeaderCrashAndRecovery(t *testing.T) {
 	c := newRecoveryTestCluster(t)
 
-	// Phase 1: Establish an initial leader.
 	c.advance(6)
 
 	oldLeader := c.leader()
@@ -370,17 +392,15 @@ func TestThreeNodeLeaderCrashAndRecovery(t *testing.T) {
 
 	t.Logf("initial leader: node %d", oldLeader)
 
-	// Phase 2: Commit a command across the cluster.
 	c.propose(oldLeader, "before", "100")
+
 	c.checkAll(map[string]string{
 		"before": "100",
 	})
 
-	// Phase 3: Crash the current leader.
 	c.crash(oldLeader)
 	t.Logf("crashed leader: node %d", oldLeader)
 
-	// Phase 4: Remaining nodes elect a new leader.
 	c.advance(20)
 
 	newLeader := c.leader()
@@ -394,8 +414,6 @@ func TestThreeNodeLeaderCrashAndRecovery(t *testing.T) {
 
 	t.Logf("new leader: node %d", newLeader)
 
-	// Phase 5: Commit new data using the surviving
-	// majority while the old leader is offline.
 	c.propose(newLeader, "during", "200")
 
 	for _, id := range c.ids {
@@ -405,15 +423,12 @@ func TestThreeNodeLeaderCrashAndRecovery(t *testing.T) {
 		}
 	}
 
-	// Phase 6: Restart the old leader from WAL.
 	c.restart(oldLeader)
 
 	t.Logf("restarted old leader: node %d", oldLeader)
 
 	c.check(oldLeader, "before", "100")
 
-	// Phase 7: Trigger synchronization. The old leader
-	// must learn about entries committed while offline.
 	c.propose(newLeader, "after", "300")
 	c.advance(6)
 
@@ -434,4 +449,139 @@ func TestThreeNodeLeaderCrashAndRecovery(t *testing.T) {
 	}
 
 	t.Log("leader crash, re-election, and recovery verified")
+}
+
+// TEST 3: Network partition and reconciliation.
+func TestThreeNodeNetworkPartitionAndReconciliation(t *testing.T) {
+	c := newRecoveryTestCluster(t)
+
+	// Phase 1: Establish the original leader.
+	c.advance(6)
+
+	oldLeader := c.leader()
+	if oldLeader == 0 {
+		t.Fatal("no initial leader")
+	}
+
+	t.Logf("initial leader: node %d", oldLeader)
+
+	c.propose(oldLeader, "stable", "100")
+
+	c.checkAll(map[string]string{
+		"stable": "100",
+	})
+
+	originalCommit := c.nodes[oldLeader].node.Status().Commit
+
+	// Phase 2: Isolate the leader.
+	c.blocked[oldLeader] = true
+
+	t.Logf("isolated leader: node %d", oldLeader)
+
+	// The isolated leader appends a command locally.
+	data, err := kvstore.EncodeCommand(kvstore.Command{
+		Op:    kvstore.OpSet,
+		Key:   "uncommitted",
+		Value: "999",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.nodes[oldLeader].node.Propose(data); err != nil {
+		t.Fatal(err)
+	}
+
+	c.deliver()
+
+	// Without a majority, the isolated leader
+	// must not advance its commit index.
+	if got := c.nodes[oldLeader].node.Status().Commit; got != originalCommit {
+		t.Fatalf(
+			"isolated leader committed without majority: %d -> %d",
+			originalCommit,
+			got,
+		)
+	}
+
+	if _, exists := c.nodes[oldLeader].store.Get("uncommitted"); exists {
+		t.Fatal("uncommitted entry was applied")
+	}
+
+	t.Log("isolated leader could not commit")
+
+	// Phase 3: The majority elects another leader.
+	c.advance(20)
+
+	newLeader := c.leader()
+	if newLeader == 0 {
+		t.Fatal("majority did not elect a replacement leader")
+	}
+
+	if newLeader == oldLeader {
+		t.Fatal("isolated leader was selected as replacement")
+	}
+
+	t.Logf("replacement leader: node %d", newLeader)
+
+	if c.nodes[newLeader].node.Status().Term <=
+		c.nodes[oldLeader].node.Status().Term {
+		t.Fatal("replacement leader must have a higher term")
+	}
+
+	// Phase 4: Majority commits new data.
+	c.propose(newLeader, "majority", "200")
+
+	for _, id := range c.ids {
+		if id == oldLeader {
+			continue
+		}
+
+		c.check(id, "stable", "100")
+		c.check(id, "majority", "200")
+	}
+
+	if _, exists := c.nodes[oldLeader].store.Get("majority"); exists {
+		t.Fatal("isolated node received majority data")
+	}
+
+	// Phase 5: Reconnect the isolated node.
+	delete(c.blocked, oldLeader)
+
+	t.Log("network partition healed")
+
+	// A new proposal triggers AppendEntries
+	// and reconciliation of conflicting logs.
+	c.propose(newLeader, "reconciled", "300")
+	c.advance(10)
+
+	// Phase 6: Verify state machine consistency.
+	c.checkAll(map[string]string{
+		"stable":     "100",
+		"majority":   "200",
+		"reconciled": "300",
+	})
+
+	// The isolated leader's uncommitted entry
+	// must never be applied.
+	for _, id := range c.ids {
+		if _, exists := c.nodes[id].store.Get("uncommitted"); exists {
+			t.Fatalf(
+				"node %d applied a discarded uncommitted entry",
+				id,
+			)
+		}
+	}
+
+	c.checkIndexes()
+
+	if c.nodes[oldLeader].node.Status().Role != raft.Follower {
+		t.Fatal("old leader did not step down")
+	}
+
+	if c.leader() != newLeader {
+		t.Fatal("unexpected leader after reconciliation")
+	}
+
+	t.Log("network partition and reconciliation verified")
 }
