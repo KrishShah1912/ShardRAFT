@@ -14,21 +14,25 @@ import (
 )
 
 // RewriteCheckpoint physically rewrites the WAL as a
-// single checkpoint containing the current persisted state.
+// single checkpoint containing the persisted Raft state.
 //
-// The caller must serialize this operation with every
-// other Raft and WAL mutation.
+// A durable, matching KV snapshot must already exist.
 //
-// A durable, matching KV snapshot must already exist
-// before historical WAL entries are discarded.
-//
-// This method must receive the same path used by Open.
-// It must not run concurrently with another WAL opener
-// or writer.
-//
-// After an error, the caller should stop using this WAL,
-// close it, and recover from the on-disk WAL.
+// The caller must serialize this operation with all
+// other WAL and Raft mutations.
 func (w *WAL) RewriteCheckpoint(path string) error {
+	return w.rewriteCheckpointWithOps(
+		path,
+		defaultPhysicalCompactionOps(),
+	)
+}
+
+// rewriteCheckpointWithOps supports filesystem failure
+// injection for testing physical WAL compaction.
+func (w *WAL) rewriteCheckpointWithOps(
+	path string,
+	ops physicalCompactionOps,
+) error {
 	if err := w.checkWritable(); err != nil {
 		return err
 	}
@@ -36,6 +40,13 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 	if path == "" {
 		return fmt.Errorf(
 			"%w: empty WAL path",
+			ErrInvalid,
+		)
+	}
+
+	if ops.rename == nil || ops.syncDir == nil {
+		return fmt.Errorf(
+			"%w: missing physical compaction operation",
 			ErrInvalid,
 		)
 	}
@@ -48,8 +59,6 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 		)
 	}
 
-	// Verify that the supplied path identifies the
-	// same file currently owned by this WAL.
 	originalInfo, err := original.Stat()
 	if err != nil {
 		w.unusable = true
@@ -75,8 +84,6 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 		)
 	}
 
-	// Construct a checkpoint from the durable
-	// in-memory WAL state.
 	checkpointState := copyState(w.state)
 
 	checkpoint := record{
@@ -84,7 +91,6 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 		State: &checkpointState,
 	}
 
-	// Validate the checkpoint against an empty state.
 	reconstructed, err := apply(
 		raft.PersistentState{},
 		checkpoint,
@@ -131,7 +137,7 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 	)
 
 	// Ensure the original WAL is durable before
-	// beginning the replacement.
+	// attempting replacement.
 	if err := original.Sync(); err != nil {
 		w.unusable = true
 		return fmt.Errorf(
@@ -142,8 +148,8 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 
 	dir := filepath.Dir(path)
 
-	// The temporary file is created in the same
-	// directory to support atomic replacement.
+	// The temporary WAL is created in the same
+	// directory to allow atomic replacement.
 	temp, err := os.CreateTemp(dir, ".wal-rewrite-*")
 	if err != nil {
 		return fmt.Errorf(
@@ -166,7 +172,6 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 		}
 	}()
 
-	// Preserve the original file permissions.
 	if err := temp.Chmod(originalInfo.Mode().Perm()); err != nil {
 		return fmt.Errorf(
 			"set temporary WAL permissions: %w",
@@ -174,7 +179,7 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 		)
 	}
 
-	// Write the complete checkpoint record.
+	// Write the checkpoint header and payload.
 	if err := writeFull(temp, header); err != nil {
 		return fmt.Errorf(
 			"write checkpoint header: %w",
@@ -196,8 +201,8 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 		)
 	}
 
-	// Verify the checkpoint stored in the temporary
-	// file before replacing the original WAL.
+	// Read back the temporary checkpoint to verify
+	// its framing, checksum, and persisted state.
 	if _, err := temp.Seek(0, io.SeekStart); err != nil {
 		return fmt.Errorf(
 			"seek temporary WAL: %w",
@@ -276,8 +281,8 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 		)
 	}
 
-	// The replacement file must be positioned at EOF
-	// so subsequent appends remain valid.
+	// Position the replacement file at EOF so
+	// subsequent WAL appends work correctly.
 	if _, err := temp.Seek(0, io.SeekEnd); err != nil {
 		return fmt.Errorf(
 			"seek checkpoint end: %w",
@@ -285,8 +290,9 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 		)
 	}
 
-	// Atomically replace the original WAL path.
-	if err := os.Rename(tempPath, path); err != nil {
+	// Atomically replace the original WAL.
+	// This operation is injectable in tests.
+	if err := ops.rename(tempPath, path); err != nil {
 		return fmt.Errorf(
 			"replace WAL: %w",
 			err,
@@ -295,38 +301,19 @@ func (w *WAL) RewriteCheckpoint(path string) error {
 
 	renamed = true
 
-	// The original descriptor now refers to the old
-	// file. Prevent further writes until the new
-	// directory entry has been synchronized.
+	// After replacement, do not permit writes until
+	// the new directory entry is synchronized.
 	w.unusable = true
 
-	directory, err := os.Open(dir)
-	if err != nil {
+	// This operation is also injectable in tests.
+	if err := ops.syncDir(dir); err != nil {
 		return fmt.Errorf(
-			"open WAL directory: %w",
+			"sync WAL directory: %w",
 			err,
 		)
 	}
 
-	syncErr := directory.Sync()
-	closeErr := directory.Close()
-
-	if syncErr != nil {
-		return fmt.Errorf(
-			"sync WAL directory: %w",
-			syncErr,
-		)
-	}
-
-	if closeErr != nil {
-		return fmt.Errorf(
-			"close WAL directory: %w",
-			closeErr,
-		)
-	}
-
-	// Switch the WAL to the replacement descriptor.
-	// The original descriptor must no longer be used.
+	// Switch to the replacement descriptor.
 	w.file = temp
 	tempOwned = false
 
