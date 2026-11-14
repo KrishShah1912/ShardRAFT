@@ -9,6 +9,7 @@ func (r *Raft) becomeFollower(term uint64, leader NodeID) {
 	r.volatile.Role = Follower
 	r.volatile.LeaderID = leader
 	r.volatile.ElectionElapsed = 0
+	r.resetElectionTimeout()
 	r.votes = make(map[NodeID]bool)
 }
 
@@ -16,6 +17,7 @@ func (r *Raft) startElection() {
 	r.volatile.Role = Candidate
 	r.volatile.LeaderID = 0
 	r.volatile.ElectionElapsed = 0
+	r.resetElectionTimeout()
 
 	r.hard.Term++
 	r.hard.Vote = r.id

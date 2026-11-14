@@ -27,6 +27,10 @@ type Raft struct {
 
 	heartbeatTimeout int
 
+	// Base election timeout and deterministic PRNG state.
+	baseElectionTimeout int
+	electionRandState   uint64
+
 	nextRequestID uint64
 	pendingAppend map[NodeID]map[uint64]uint64
 
@@ -46,13 +50,15 @@ func NewRaft(
 	}
 
 	r := &Raft{
-		id:               id,
-		peers:            append([]NodeID(nil), peers...),
-		votes:            make(map[NodeID]bool),
-		nextIndex:        make(map[NodeID]uint64),
-		matchIndex:       make(map[NodeID]uint64),
-		pendingAppend:    make(map[NodeID]map[uint64]uint64),
-		heartbeatTimeout: 2,
+		id:                  id,
+		peers:               append([]NodeID(nil), peers...),
+		votes:               make(map[NodeID]bool),
+		nextIndex:           make(map[NodeID]uint64),
+		matchIndex:          make(map[NodeID]uint64),
+		pendingAppend:       make(map[NodeID]map[uint64]uint64),
+		heartbeatTimeout:    2,
+		baseElectionTimeout: electionTimeout,
+		electionRandState:   uint64(id)*6364136223846793005 + 1442695040888963407,
 	}
 
 	r.volatile.Role = Follower
@@ -171,7 +177,15 @@ func (r *Raft) Step(msg Message) error {
 	}
 
 	if msg.Term > r.hard.Term {
+		// A rejected higher-term vote request must not
+		// postpone this node's own election indefinitely.
+		elapsed := r.volatile.ElectionElapsed
+
 		r.becomeFollower(msg.Term, 0)
+
+		if msg.Type == MsgVote {
+			r.volatile.ElectionElapsed = elapsed
+		}
 	}
 
 	switch msg.Type {
@@ -287,10 +301,14 @@ func (r *Raft) majority() int {
 	return (len(r.peers)+1)/2 + 1
 }
 
+// sendHeartbeats periodically retries AppendEntries.
+// This lets followers catch up after network recovery,
+// even when no new client commands are proposed.
 func (r *Raft) sendHeartbeats() {
 	for _, peer := range r.peers {
 		matchIndex := r.matchIndex[peer]
 
+		// Preserve explicit heartbeat messages.
 		r.messages = append(r.messages, Message{
 			Type:    MsgHeartbeat,
 			From:    r.id,
@@ -300,6 +318,11 @@ func (r *Raft) sendHeartbeats() {
 			LogTerm: r.termAt(matchIndex),
 			Commit:  r.hard.Commit,
 		})
+
+		// Send AppendEntries even when the follower
+		// already has every log entry. An empty append
+		// carries the latest leader commit index.
+		r.sendAppend(peer)
 	}
 }
 
@@ -372,4 +395,20 @@ func cloneEntries(entries []Entry) []Entry {
 	}
 
 	return copied
+}
+
+// resetElectionTimeout chooses a deterministic pseudo-random
+// election timeout in [base, 2*base).
+// Different nodes and election rounds use different values.
+func (r *Raft) resetElectionTimeout() {
+	r.electionRandState = r.electionRandState*6364136223846793005 +
+		1442695040888963407
+
+	base := r.baseElectionTimeout
+	if base <= 0 {
+		return
+	}
+
+	jitter := int((r.electionRandState >> 32) % uint64(base))
+	r.volatile.ElectionTimeout = base + jitter
 }
