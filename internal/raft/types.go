@@ -40,7 +40,6 @@ const (
 )
 
 // Message represents communication between nodes.
-
 type Message struct {
 	Type MessageType
 
@@ -52,7 +51,6 @@ type Message struct {
 	Index   uint64
 	Commit  uint64
 
-	// Correlates AppendEntries requests and responses.
 	RequestID uint64
 
 	Entries []Entry
@@ -66,7 +64,7 @@ type HardState struct {
 	Commit uint64
 }
 
-// PersistentState survives simulated restarts.
+// PersistentState survives restarts.
 type PersistentState struct {
 	HardState HardState
 	Log       []Entry
@@ -86,15 +84,19 @@ type VolatileState struct {
 	ElectionTimeout  int
 }
 
-// Ready contains work produced by the Raft state machine.
+// Ready contains pending work produced by Raft.
 type Ready struct {
 	Messages         []Message
 	Entries          []Entry
 	CommittedEntries []Entry
 	HardState        *HardState
+
+	// First index of a persisted suffix that must be removed.
+	// Zero means no truncation is required.
+	TruncateFrom uint64
 }
 
-// Status exposes a node's current state.
+// Status exposes the node's current state.
 type Status struct {
 	ID       NodeID
 	Role     Role
