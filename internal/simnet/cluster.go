@@ -9,6 +9,16 @@ import (
 type Cluster struct {
 	Nodes map[raft.NodeID]*raft.Raft
 	IDs   []raft.NodeID
+
+	// DropMessage allows tests to selectively discard messages.
+	// A nil callback means all messages are delivered.
+	DropMessage func(raft.Message) bool
+
+	// HoldMessage selects messages for delayed delivery.
+	HoldMessage func(raft.Message) bool
+
+	// HeldMessages contains messages waiting for release.
+	HeldMessages []raft.Message
 }
 
 // NewCluster creates nodes with different election timeouts.
