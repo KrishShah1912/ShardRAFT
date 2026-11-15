@@ -19,6 +19,7 @@ type Storage interface {
 
 // Verify that WAL implements Storage.
 var _ Storage = (*wal.WAL)(nil)
+var _ Storage = (*wal.SegmentedWAL)(nil)
 
 // Consensus is the Raft interface required by the driver.
 type Consensus interface {

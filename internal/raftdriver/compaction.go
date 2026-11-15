@@ -129,7 +129,12 @@ func (d *Driver) compactKVWith(
 		)
 	}
 
-	s := snapshot.New(index, term, data)
+	s := snapshot.NewWithDedup(
+		index,
+		term,
+		data,
+		store.SnapshotDedup(),
+	)
 
 	// Save the snapshot atomically.
 	if err := snapshot.Save(snapshotPath, s); err != nil {

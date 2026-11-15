@@ -18,10 +18,11 @@ var (
 )
 
 type Snapshot struct {
-	Version      int               `json:"version"`
-	AppliedIndex uint64            `json:"applied_index"`
-	AppliedTerm  uint64            `json:"applied_term"`
-	Data         map[string]string `json:"data"`
+	Version      int                    `json:"version"`
+	AppliedIndex uint64                 `json:"applied_index"`
+	AppliedTerm  uint64                 `json:"applied_term"`
+	Data         map[string]string      `json:"data"`
+	Dedup        map[string]DedupRecord `json:"dedup,omitempty"`
 }
 
 type envelope struct {

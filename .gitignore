@@ -14,4 +14,8 @@ coverage.txt
 .vscode/
 .DS_Store
 
+/shardraft*.backup
+
+# Generated binaries and backup files
 /shardraft
+*.backup
