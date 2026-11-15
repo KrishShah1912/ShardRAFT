@@ -3,7 +3,7 @@
 
 ### Building a Fault-Tolerant Distributed Key-Value Database
 
-**Project Status:** Active Development — Raft Consensus Prototype Implemented and Tested
+**Project Status:** Active Development — Raft Consensus, Durable Storage, Recovery, and Fault Testing Implemented
 
 **Team Members:** Krish Shah, Hetansh Patel, Sri Veda 
 
@@ -30,11 +30,21 @@ Unlike a database that simply connects to an existing storage service, ShardRAFT
 
 ### Current implementation status
 
-The current repository contains a working Raft consensus prototype and an in-memory cluster simulator.
+ShardRAFT currently implements a Go-based Raft consensus engine, an in-memory
+cluster simulator, write-ahead logging (WAL), a key-value state machine,
+snapshots, log compaction, and crash recovery.
 
-Leader election, log replication, majority-based commit tracking, follower catch-up, and several important safety checks have been implemented and tested.
+The implementation includes leader election, majority-based log commitment,
+follower catch-up, replication request correlation, and safety invariants.
 
-**Important:** ShardRAFT is not yet a complete distributed database. Persistent storage, real networking, database APIs, sharding, and the frontend are planned development stages.
+Testing covers simulated network partitions, selective message loss,
+delayed and reordered replication responses, restart recovery,
+and deterministic randomized fault workloads.
+
+**Important:** ShardRAFT remains under active development. Real node-to-node
+networking, client-facing APIs, distributed sharding, and the frontend
+dashboard are future development stages. The current tests do not constitute
+a proof of correctness under all possible failures.
 
 ---
 
@@ -105,7 +115,11 @@ Measure throughput, latency, recovery time, and correctness under controlled wor
 | Go race detector | Detecting data races during tests |
 | Git | Version control |
 | GitHub | Source code hosting |
-| In-memory state | Current Raft logs and node state |
+| In-memory state | Raft state and cluster simulation |
+| Write-ahead logging (WAL) | Durable Raft state and log storage |
+| Key-value state machine | Applying committed database operations |
+| Snapshots and log compaction | State recovery and bounded log history |
+| Deterministic fault injection | Simulating message loss, delays, and reordering |
 
 ### Planned technologies
 
@@ -116,7 +130,6 @@ Measure throughput, latency, recovery time, and correctness under controlled wor
 | Go HTTP API | Client-facing backend operations |
 | gRPC / Protocol Buffers | Communication between distributed nodes |
 | BadgerDB or BoltDB | Embedded key-value storage |
-| Write-ahead log | Durable Raft state |
 | Docker | Containerized deployment |
 | Docker Compose | Multi-node local deployment |
 | Prometheus / Grafana | Metrics and monitoring |
@@ -763,9 +776,11 @@ At the latest reported verification, the following commands passed:
 | Command | Result |
 |---|---|
 | `go test -count=1 ./...` | Passed |
-| `go test -race ./...` | Passed |
+| `go test -race -count=1 ./...` | Passed |
 | `go vet ./...` | Passed |
 | `go build ./...` | Passed |
+| `go test -tags=stress -count=1 -run '^TestExtendedRaftStress$' ./internal/raftdriver` | Passed |
+| `go test -tags=stress -race -count=1 -run '^TestExtendedRaftStress$' ./internal/raftdriver` | Passed |
 
 These results demonstrate that the tested implementation works for the covered scenarios.
 
@@ -798,6 +813,21 @@ The Raft tests developed so far cover scenarios including:
 | `TestUnsentAppendResponseDoesNotAdvanceMatchIndex` | Unknown-response rejection |
 | `TestThreeNodeElection` | Cluster leader election |
 | `TestThreeNodeReplication` | Cluster replication and commit |
+
+Additional verified test coverage includes:
+
+- End-to-end replication with dropped acknowledgments
+- Delayed and reverse-order replication responses
+- Majority commitment despite an unavailable acknowledgment
+- Eventual follower recovery after network restoration
+- Committed-log consistency and Raft invariant checking
+- WAL persistence and crash recovery
+- KV snapshot restoration and log compaction
+- Deterministic randomized fault testing
+
+The extended stress test exercises 100 seeds with 100 operations per seed.
+These tests cover selected failure scenarios rather than every possible
+distributed-system execution.
 
 Additional tests will be introduced as the system expands.
 
@@ -1123,20 +1153,20 @@ No performance benchmark results are claimed at the current stage.
 
 ### Phase 2 — Raft Hardening
 
-- [ ] Improve handling of reordered replication responses
-- [ ] Clean up outstanding requests during leadership changes
-- [ ] Expand election safety tests
-- [ ] Add more failure and partition scenarios
-- [ ] Strengthen consensus correctness verification
+- [x] Improve handling of reordered replication responses
+- [x] Clean up outstanding requests during leadership changes
+- [x] Expand election safety tests
+- [x] Add more failure and partition scenarios
+- [x] Strengthen consensus correctness verification through invariants and randomized testing
 
 ### Phase 3 — Persistent Storage
 
-- [ ] Implement write-ahead logging
-- [ ] Persist Raft state
-- [ ] Build the key-value state machine
-- [ ] Add snapshots
-- [ ] Implement crash recovery
-- [ ] Test data recovery after restart
+- [x] Implement write-ahead logging
+- [x] Persist Raft state
+- [x] Build the key-value state machine
+- [x] Add snapshots
+- [x] Implement crash recovery
+- [x] Test data recovery after restart
 
 ### Phase 4 — Backend and Networking
 
@@ -1166,7 +1196,7 @@ No performance benchmark results are claimed at the current stage.
 
 ### Phase 7 — Evaluation and Deployment
 
-- [ ] Add fault-injection experiments
+- [x] Add deterministic fault-injection experiments
 - [ ] Add linearizability checking
 - [ ] Benchmark throughput and latency
 - [ ] Measure recovery time
@@ -1182,17 +1212,18 @@ ShardRAFT is under active development.
 
 The following limitations currently apply:
 
-1. The verified Raft implementation primarily operates in memory.
-2. The cluster simulator does not represent a real network deployment.
-3. Durable write-ahead logging and snapshots are not yet verified.
-4. A complete key-value state machine is not yet available.
-5. Client-facing database APIs have not yet been completed.
-6. Sharding and distributed metadata management remain planned.
-7. The frontend dashboard is not yet implemented.
-8. Full crash-recovery guarantees have not been demonstrated.
-9. Exhaustive Raft safety and linearizability verification remain future work.
+1. The current cluster simulator does not represent a real network deployment.
+2. Independent node processes and production network transport are not yet implemented.
+3. Client-facing database APIs and request routing are not yet complete.
+4. Sharding and distributed metadata management remain planned.
+5. The frontend dashboard has not yet been implemented.
+6. Network-based snapshot installation for followers behind the compacted log boundary is not implemented.
+7. Crash recovery and persistence are tested for selected scenarios, not every possible failure or storage fault.
+8. Exhaustive Raft safety and linearizability verification remain future work.
+9. Production performance and scalability benchmarks have not yet been established.
 
-These limitations are documented so readers can distinguish the current prototype from the intended final system.
+These limitations distinguish the tested implementation from the
+intended complete distributed database.
 
 ---
 
