@@ -27,6 +27,23 @@ func RecoverKVDriver(
 	electionTimeout int,
 	send SendFunc,
 ) (*raft.Raft, *wal.WAL, *Driver, *kvstore.Store, error) {
+	return recoverKVDriverWithEngine(
+		walPath, snapshotPath, id, peers,
+		electionTimeout, send, nil,
+	)
+}
+
+// recoverKVDriverWithEngine supports an optional KV engine.
+// The caller owns the engine and is responsible for closing it.
+func recoverKVDriverWithEngine(
+	walPath string,
+	snapshotPath string,
+	id raft.NodeID,
+	peers []raft.NodeID,
+	electionTimeout int,
+	send SendFunc,
+	engine kvstore.Engine,
+) (*raft.Raft, *wal.WAL, *Driver, *kvstore.Store, error) {
 	if send == nil {
 		return nil, nil, nil, nil, errors.New(
 			"send callback is required",
@@ -48,6 +65,14 @@ func RecoverKVDriver(
 	}
 
 	store := kvstore.New()
+	if engine != nil {
+		store, err = kvstore.NewWithEngine(engine)
+		if err != nil {
+			return fail(fmt.Errorf(
+				"attach KV engine: %w", err,
+			))
+		}
+	}
 	base := node.SnapshotMetadata()
 
 	s, loadErr := snapshot.Load(snapshotPath)
@@ -101,6 +126,13 @@ func RecoverKVDriver(
 		); err != nil {
 			return fail(fmt.Errorf(
 				"restore KV state: %w", err,
+			))
+		}
+
+		// Restore request history from the snapshot.
+		if err := store.RestoreDedup(s.Dedup); err != nil {
+			return fail(fmt.Errorf(
+				"restore request history: %w", err,
 			))
 		}
 	}

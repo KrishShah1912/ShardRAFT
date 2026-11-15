@@ -9,14 +9,19 @@ import (
 type Operation string
 
 const (
-	OpSet    Operation = "SET"
-	OpDelete Operation = "DELETE"
+	OpSet            Operation = "SET"
+	OpPut            Operation = "PUT"
+	OpDelete         Operation = "DELETE"
+	OpCompareAndSwap Operation = "COMPARE_AND_SWAP"
 )
 
 type Command struct {
-	Op    Operation `json:"op"`
-	Key   string    `json:"key"`
-	Value string    `json:"value,omitempty"`
+	Op        Operation `json:"op"`
+	Key       string    `json:"key"`
+	Value     string    `json:"value,omitempty"`
+	Expected  string    `json:"expected,omitempty"`
+	ClientID  string    `json:"client_id,omitempty"`
+	RequestID string    `json:"request_id,omitempty"`
 }
 
 func (c Command) Validate() error {
@@ -24,15 +29,18 @@ func (c Command) Validate() error {
 		return errors.New("key cannot be empty")
 	}
 
+	if (c.ClientID == "") != (c.RequestID == "") {
+		return errors.New("client_id and request_id must be supplied together")
+	}
+
 	switch c.Op {
-	case OpSet, OpDelete:
+	case OpSet, OpPut, OpDelete, OpCompareAndSwap:
 		return nil
 	default:
 		return fmt.Errorf("unsupported operation: %q", c.Op)
 	}
 }
 
-// EncodeCommand serializes a command for the Raft log.
 func EncodeCommand(c Command) ([]byte, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
@@ -41,7 +49,6 @@ func EncodeCommand(c Command) ([]byte, error) {
 	return json.Marshal(c)
 }
 
-// DecodeCommand parses and validates a command.
 func DecodeCommand(data []byte) (Command, error) {
 	var c Command
 
