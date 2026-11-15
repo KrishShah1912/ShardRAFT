@@ -64,11 +64,11 @@ func (r *Raft) sendAppend(peer NodeID) {
 	r.nextRequestID++
 	requestID := r.nextRequestID
 
-	if r.pendingAppend[peer] == nil {
-		r.pendingAppend[peer] = make(map[uint64]uint64)
+	// Keep only the latest outstanding request per follower.
+	// Older responses will be ignored.
+	r.pendingAppend[peer] = map[uint64]uint64{
+		requestID: lastIndex,
 	}
-
-	r.pendingAppend[peer][requestID] = lastIndex
 
 	r.messages = append(r.messages, Message{
 		Type:      MsgAppend,

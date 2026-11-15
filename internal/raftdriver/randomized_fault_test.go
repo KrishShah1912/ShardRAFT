@@ -11,10 +11,12 @@ import (
 // TestRandomizedRaftFaults exercises deterministic
 // randomized crashes, restarts, partitions, and proposals.
 func TestRandomizedRaftFaults(t *testing.T) {
-	const seeds = 25
-	const steps = 40
+	runRandomizedRaftFaults(t, 25, 40)
+}
 
-	for seed := int64(1); seed <= seeds; seed++ {
+func runRandomizedRaftFaults(t *testing.T, seeds, steps int) {
+
+	for seed := int64(1); seed <= int64(seeds); seed++ {
 		t.Run(fmt.Sprintf("seed_%d", seed), func(t *testing.T) {
 			rng := rand.New(rand.NewSource(seed))
 			c := newRecoveryTestCluster(t)
@@ -90,11 +92,26 @@ func TestRandomizedRaftFaults(t *testing.T) {
 
 				c.advance(2)
 
+				// Check committed-log agreement across nodes,
+				// including nodes that are temporarily offline.
+				checkCommittedLogConsistency(t, c)
+
 				// Safety check: applied index must
 				// never exceed committed index.
 				for _, nodeID := range c.ids {
 					if !c.online[nodeID] {
 						continue
+					}
+
+					// Validate internal Raft safety invariants.
+					if err := c.nodes[nodeID].node.CheckInvariants(); err != nil {
+						t.Fatalf(
+							"seed=%d step=%d node=%d: invariant violation: %v",
+							seed,
+							step,
+							nodeID,
+							err,
+						)
 					}
 
 					status := c.nodes[nodeID].node.Status()
