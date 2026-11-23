@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/api/client.ts","./src/components/nodecard.tsx","./src/components/sidebar.tsx","./src/features/cluster.tsx","./src/features/events.tsx","./src/features/overview.tsx","./src/features/placeholder.tsx","./src/features/queryconsole.tsx","./src/lib/format.ts","./src/realtime/events.ts","./src/types/index.ts"],"version":"5.9.3"}

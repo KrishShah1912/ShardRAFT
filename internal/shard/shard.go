@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/KrishShah1912/shardraft/internal/kvstore"
+	"github.com/KrishShah1912/shardraft/internal/observability"
 	"github.com/KrishShah1912/shardraft/internal/raft"
 	"github.com/KrishShah1912/shardraft/internal/raftdriver"
 	"github.com/KrishShah1912/shardraft/internal/wal"
@@ -21,6 +22,7 @@ type Config struct {
 	SnapshotPath    string
 	SegmentOptions  wal.SegmentOptions
 	Send            raftdriver.SendFunc
+	Events          *observability.Bus
 }
 
 type Shard struct {
@@ -77,6 +79,20 @@ func Open(cfg Config) (*Shard, error) {
 		)
 	if err != nil {
 		return nil, err
+	}
+
+	if cfg.Events != nil {
+		node.SetEventHandler(func(event raft.Event) {
+			status := node.Status()
+
+			cfg.Events.Publish(observability.Event{
+				NodeID:   status.ID,
+				Category: observability.CategoryRaft,
+				Type:     event.Type,
+				Term:     status.Term,
+				Data:     event.Data,
+			})
+		})
 	}
 
 	if err := driver.Process(); err != nil {
