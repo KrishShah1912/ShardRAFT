@@ -10,6 +10,13 @@ func (r *Raft) appendEntry(data []byte, entryType EntryType) Entry {
 	}
 
 	r.log = append(r.log, entry)
+
+	r.emit(EventEntryAppended, map[string]any{
+		"index": entry.Index,
+		"term":  entry.Term,
+		"type":  entry.Type,
+	})
+
 	return entry
 }
 
@@ -70,6 +77,15 @@ func (r *Raft) sendAppend(peer NodeID) {
 		requestID: lastIndex,
 	}
 
+	r.emit(EventAppendSent, map[string]any{
+		"to":             peer,
+		"request_id":     requestID,
+		"previous_index": prevIndex,
+		"previous_term":  r.termAt(prevIndex),
+		"entries":        len(entries),
+		"commit_index":   r.hard.Commit,
+	})
+
 	r.messages = append(r.messages, Message{
 		Type:      MsgAppend,
 		From:      r.id,
@@ -91,6 +107,14 @@ func (r *Raft) replicate() {
 }
 
 func (r *Raft) handleAppendEntries(msg Message) {
+	r.emit(EventAppendReceived, map[string]any{
+		"from":           msg.From,
+		"request_id":     msg.RequestID,
+		"previous_index": msg.Index,
+		"entries":        len(msg.Entries),
+		"leader_commit":  msg.Commit,
+	})
+
 	reply := Message{
 		Type:      MsgAppendResp,
 		From:      r.id,
@@ -101,8 +125,19 @@ func (r *Raft) handleAppendEntries(msg Message) {
 		RequestID: msg.RequestID,
 	}
 
-	if msg.Term < r.hard.Term {
+	reject := func(reason string) {
+		r.emit(EventAppendRejected, map[string]any{
+			"from":       msg.From,
+			"request_id": msg.RequestID,
+			"index":      msg.Index,
+			"reason":     reason,
+		})
+
 		r.messages = append(r.messages, reply)
+	}
+
+	if msg.Term < r.hard.Term {
+		reject("stale_term")
 		return
 	}
 
@@ -112,17 +147,17 @@ func (r *Raft) handleAppendEntries(msg Message) {
 	// The follower cannot verify an entry older than
 	// its snapshot boundary.
 	if msg.Index < r.snapshotIndex {
-		r.messages = append(r.messages, reply)
+		reject("before_snapshot_boundary")
 		return
 	}
 
 	if msg.Index > r.lastIndex() {
-		r.messages = append(r.messages, reply)
+		reject("missing_previous_entry")
 		return
 	}
 
 	if r.termAt(msg.Index) != msg.LogTerm {
-		r.messages = append(r.messages, reply)
+		reject("previous_term_mismatch")
 		return
 	}
 
@@ -130,7 +165,7 @@ func (r *Raft) handleAppendEntries(msg Message) {
 	for i, entry := range msg.Entries {
 		expected := msg.Index + 1 + uint64(i)
 		if entry.Index != expected {
-			r.messages = append(r.messages, reply)
+			reject("invalid_entry_index")
 			return
 		}
 	}
@@ -145,13 +180,13 @@ func (r *Raft) handleAppendEntries(msg Message) {
 
 		existing, ok := r.entryAt(entry.Index)
 		if !ok {
-			r.messages = append(r.messages, reply)
+			reject("entry_unavailable")
 			return
 		}
 
 		if existing.Term != entry.Term {
 			if entry.Index <= r.hard.Commit {
-				r.messages = append(r.messages, reply)
+				reject("committed_entry_conflict")
 				return
 			}
 
@@ -166,9 +201,10 @@ func (r *Raft) handleAppendEntries(msg Message) {
 		if firstNewIndex <= r.lastIndex() {
 			offset, ok := r.logOffset(firstNewIndex)
 			if !ok {
-				r.messages = append(r.messages, reply)
+				reject("invalid_log_offset")
 				return
 			}
+
 			r.log = r.log[:offset]
 		}
 
@@ -192,13 +228,28 @@ func (r *Raft) handleAppendEntries(msg Message) {
 		}
 
 		if newCommit > r.hard.Commit {
+			previousCommit := r.hard.Commit
+
 			r.hard.Commit = newCommit
 			r.volatile.CommitIndex = newCommit
+
+			r.emit(EventCommitAdvanced, map[string]any{
+				"previous_commit": previousCommit,
+				"commit_index":    newCommit,
+				"source":          "append_entries",
+			})
 		}
 	}
 
 	reply.Reject = false
 	reply.Index = msg.Index + uint64(len(msg.Entries))
+
+	r.emit(EventAppendAccepted, map[string]any{
+		"from":       msg.From,
+		"request_id": msg.RequestID,
+		"index":      reply.Index,
+	})
+
 	r.messages = append(r.messages, reply)
 }
 
@@ -214,6 +265,7 @@ func (r *Raft) handleAppendResponse(msg Message) {
 			break
 		}
 	}
+
 	if !knownPeer {
 		return
 	}
@@ -224,6 +276,7 @@ func (r *Raft) handleAppendResponse(msg Message) {
 	if msg.RequestID == 0 || !exists {
 		return
 	}
+
 	delete(pending, msg.RequestID)
 
 	if !msg.Reject && msg.Index != expectedIndex {
@@ -242,9 +295,18 @@ func (r *Raft) handleAppendResponse(msg Message) {
 			r.nextIndex[msg.From] = next - 1
 		}
 
+		r.emit(EventAppendRejected, map[string]any{
+			"from":       msg.From,
+			"request_id": msg.RequestID,
+			"index":      msg.Index,
+			"next_index": r.nextIndex[msg.From],
+			"reason":     "follower_rejected",
+		})
+
 		if r.nextIndex[msg.From] <= r.lastIndex() {
 			r.sendAppend(msg.From)
 		}
+
 		return
 	}
 
@@ -256,8 +318,21 @@ func (r *Raft) handleAppendResponse(msg Message) {
 		return
 	}
 
+	previousMatch := r.matchIndex[msg.From]
+	previousNext := r.nextIndex[msg.From]
+
 	r.matchIndex[msg.From] = msg.Index
 	r.nextIndex[msg.From] = msg.Index + 1
+
+	r.emit(EventReplicationProgress, map[string]any{
+		"peer_id":        msg.From,
+		"previous_match": previousMatch,
+		"match_index":    msg.Index,
+		"previous_next":  previousNext,
+		"next_index":     msg.Index + 1,
+		"request_id":     msg.RequestID,
+	})
+
 	r.maybeCommit()
 }
 
@@ -279,8 +354,19 @@ func (r *Raft) maybeCommit() {
 		}
 
 		if count >= r.majority() {
+			previousCommit := r.hard.Commit
+
 			r.hard.Commit = index
 			r.volatile.CommitIndex = index
+
+			r.emit(EventCommitAdvanced, map[string]any{
+				"previous_commit": previousCommit,
+				"commit_index":    index,
+				"replicas":        count,
+				"majority":        r.majority(),
+				"source":          "leader_quorum",
+			})
+
 			return
 		}
 	}

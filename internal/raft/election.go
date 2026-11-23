@@ -1,6 +1,9 @@
 package raft
 
 func (r *Raft) becomeFollower(term uint64, leader NodeID) {
+	previousRole := r.volatile.Role
+	previousTerm := r.hard.Term
+
 	if term > r.hard.Term {
 		r.hard.Term = term
 		r.hard.Vote = 0
@@ -11,9 +14,27 @@ func (r *Raft) becomeFollower(term uint64, leader NodeID) {
 	r.volatile.ElectionElapsed = 0
 	r.resetElectionTimeout()
 	r.votes = make(map[NodeID]bool)
+
+	if previousTerm != r.hard.Term {
+		r.emit(EventTermChanged, map[string]any{
+			"previous_term": previousTerm,
+			"term":          r.hard.Term,
+		})
+	}
+
+	if previousRole != Follower {
+		r.emit(EventRoleChanged, map[string]any{
+			"previous_role": previousRole,
+			"role":          Follower,
+			"leader_id":     leader,
+		})
+	}
 }
 
 func (r *Raft) startElection() {
+	previousRole := r.volatile.Role
+	previousTerm := r.hard.Term
+
 	r.volatile.Role = Candidate
 	r.volatile.LeaderID = 0
 	r.volatile.ElectionElapsed = 0
@@ -21,6 +42,20 @@ func (r *Raft) startElection() {
 
 	r.hard.Term++
 	r.hard.Vote = r.id
+
+	r.emit(EventTermChanged, map[string]any{
+		"previous_term": previousTerm,
+		"term":          r.hard.Term,
+	})
+
+	r.emit(EventRoleChanged, map[string]any{
+		"previous_role": previousRole,
+		"role":          Candidate,
+	})
+
+	r.emit(EventElectionStarted, map[string]any{
+		"term": r.hard.Term,
+	})
 
 	r.votes = map[NodeID]bool{
 		r.id: true,
@@ -34,6 +69,13 @@ func (r *Raft) startElection() {
 	lastIndex, lastTerm := r.lastLogInfo()
 
 	for _, peer := range r.peers {
+		r.emit(EventVoteRequested, map[string]any{
+			"to":         peer,
+			"term":       r.hard.Term,
+			"last_index": lastIndex,
+			"last_term":  lastTerm,
+		})
+
 		r.messages = append(r.messages, Message{
 			Type:    MsgVote,
 			From:    r.id,
@@ -46,6 +88,8 @@ func (r *Raft) startElection() {
 }
 
 func (r *Raft) becomeLeader() {
+	previousRole := r.volatile.Role
+
 	r.volatile.Role = Leader
 	r.volatile.LeaderID = r.id
 	r.volatile.HeartbeatElapsed = 0
@@ -57,7 +101,24 @@ func (r *Raft) becomeLeader() {
 		r.matchIndex[peer] = 0
 	}
 
-	r.appendEntry(nil, EntryNoop)
+	r.emit(EventRoleChanged, map[string]any{
+		"previous_role": previousRole,
+		"role":          Leader,
+		"leader_id":     r.id,
+	})
+
+	r.emit(EventLeaderElected, map[string]any{
+		"leader_id": r.id,
+		"term":      r.hard.Term,
+	})
+
+	entry := r.appendEntry(nil, EntryNoop)
+
+	r.emit(EventNoopAppended, map[string]any{
+		"index": entry.Index,
+		"term":  entry.Term,
+	})
+
 	r.replicate()
 	r.maybeCommit()
 }
@@ -91,6 +152,16 @@ func (r *Raft) handleVoteRequest(msg Message) {
 		To:     msg.From,
 		Term:   r.hard.Term,
 		Reject: !granted,
+	})
+
+	eventType := EventVoteRejected
+	if granted {
+		eventType = EventVoteGranted
+	}
+
+	r.emit(eventType, map[string]any{
+		"candidate_id": msg.From,
+		"term":         r.hard.Term,
 	})
 }
 
@@ -138,7 +209,15 @@ func (r *Raft) handleAppend(msg Message) {
 	}
 
 	if newCommit > r.hard.Commit {
+		previousCommit := r.hard.Commit
+
 		r.hard.Commit = newCommit
 		r.volatile.CommitIndex = newCommit
+
+		r.emit(EventCommitAdvanced, map[string]any{
+			"previous_commit": previousCommit,
+			"commit_index":    newCommit,
+			"source":          "heartbeat",
+		})
 	}
 }
