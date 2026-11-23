@@ -22,3 +22,8 @@ coverage.txt
 
 # Local ShardRAFT development cluster
 .dev-cluster/
+
+# Frontend dependencies and build artifacts
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
