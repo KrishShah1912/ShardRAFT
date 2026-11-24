@@ -97,6 +97,11 @@ type VolatileState struct {
 
 // Ready contains pending work produced by Raft.
 type Ready struct {
+	// ReadStates contains quorum-confirmed read barriers.
+	// The caller must verify the state machine's applied
+	// index before serving the corresponding reads.
+	ReadStates []ReadState
+
 	Messages         []Message
 	Entries          []Entry
 	CommittedEntries []Entry

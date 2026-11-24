@@ -7,6 +7,12 @@ import (
 )
 
 type Cluster struct {
+	// Independent simulated state-machine progress.
+	applications map[raft.NodeID]*simApplication
+
+	// Collected quorum-confirmed read barriers.
+	readStates []SimReadState
+
 	Nodes map[raft.NodeID]*raft.Raft
 	IDs   []raft.NodeID
 

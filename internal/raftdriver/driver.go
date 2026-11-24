@@ -43,6 +43,9 @@ type Driver struct {
 	apply   ApplyFunc
 	send    SendFunc
 
+	readStateHandler      ReadStateFunc
+	readStateAppliedIndex AppliedIndexFunc
+
 	stopped bool
 }
 
@@ -89,6 +92,7 @@ func New(
 // 4. Apply committed entries.
 // 5. Acknowledge Ready.
 // 6. Send outgoing messages.
+// 7. Deliver and acknowledge read states.
 //
 // The caller must serialize calls to Process() and
 // all mutations of the underlying Raft node.
@@ -167,6 +171,13 @@ func (d *Driver) Process() error {
 				"send Raft messages: %w", err,
 			))
 		}
+	}
+
+	// Step 7: Deliver confirmed read barriers only after
+	// persistence, application, advancement, and sending
+	// have completed successfully.
+	if err := d.processReadStates(ready.ReadStates); err != nil {
+		return d.stop(err)
 	}
 
 	return nil

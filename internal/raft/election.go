@@ -1,6 +1,12 @@
 package raft
 
 func (r *Raft) becomeFollower(term uint64, leader NodeID) {
+
+	if r.volatile.Role == Leader ||
+		term != r.hard.Term {
+		r.invalidateReads()
+	}
+
 	previousRole := r.volatile.Role
 	previousTerm := r.hard.Term
 
@@ -32,6 +38,8 @@ func (r *Raft) becomeFollower(term uint64, leader NodeID) {
 }
 
 func (r *Raft) startElection() {
+	r.invalidateReads()
+
 	previousRole := r.volatile.Role
 	previousTerm := r.hard.Term
 
@@ -88,6 +96,8 @@ func (r *Raft) startElection() {
 }
 
 func (r *Raft) becomeLeader() {
+	r.invalidateReads()
+
 	previousRole := r.volatile.Role
 
 	r.volatile.Role = Leader
