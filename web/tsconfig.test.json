@@ -10,7 +10,9 @@
   },
   "include": [
     "src/api/routing.ts",
-    "src/api/client.ts"
+    "src/api/client.ts",
+    "src/validation/report.ts",
+    "src/validation/types.ts"
   ],
   "exclude": [
     "node_modules",

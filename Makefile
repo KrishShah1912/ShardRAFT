@@ -68,3 +68,14 @@ dev-supervisor:
 
 dev:
 	@./scripts/dev.sh
+
+.PHONY: validation
+
+validation:
+	cd web && npm run validation:generate
+
+
+.PHONY: validation-standard
+
+validation-standard:
+	cd web && npm run validation:standard
