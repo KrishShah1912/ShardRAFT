@@ -12,13 +12,37 @@ const (
 	maxRetryDelay       = 400 * time.Millisecond
 )
 
-// deliverWithRetry retries temporary delivery failures with
-// bounded exponential backoff.
+// deliverWithRetry preserves the original transport-internal API.
 //
-// Delivery remains best-effort: after the final failure,
-// the caller receives an error.
+// The destination peer worker is resolved from the outgoing
+// message so callers and existing tests do not need to know
+// about telemetry bookkeeping.
 func (t *HTTPTransport) deliverWithRetry(
 	ctx context.Context,
+	item outgoing,
+) error {
+	t.mu.Lock()
+	worker := t.peers[item.message.To]
+	t.mu.Unlock()
+
+	if worker == nil {
+		return fmt.Errorf(
+			"%w: %d",
+			ErrPeer,
+			item.message.To,
+		)
+	}
+
+	return t.deliverWithRetryForPeer(
+		ctx,
+		worker,
+		item,
+	)
+}
+
+func (t *HTTPTransport) deliverWithRetryForPeer(
+	ctx context.Context,
+	worker *peerWorker,
 	item outgoing,
 ) error {
 	delay := initialRetryDelay
@@ -29,15 +53,37 @@ func (t *HTTPTransport) deliverWithRetry(
 			return err
 		}
 
-		if err := t.deliver(ctx, item); err == nil {
+		err := t.deliver(
+			ctx,
+			worker,
+			item,
+			attempt,
+		)
+
+		if err == nil {
 			return nil
-		} else {
-			lastErr = err
 		}
+
+		lastErr = err
 
 		if attempt == maxDeliveryAttempts {
 			break
 		}
+
+		worker.mu.Lock()
+		worker.retries++
+		worker.mu.Unlock()
+
+		t.emit(EventRetry, map[string]any{
+			"peer_id":      worker.id,
+			"address":      worker.address,
+			"message_type": item.message.Type,
+			"request_id":   item.message.RequestID,
+			"attempt":      attempt,
+			"next_attempt": attempt + 1,
+			"delay_ms":     delay.Milliseconds(),
+			"error":        err.Error(),
+		})
 
 		timer := time.NewTimer(delay)
 
@@ -50,10 +96,36 @@ func (t *HTTPTransport) deliverWithRetry(
 		}
 
 		delay *= 2
+
 		if delay > maxRetryDelay {
 			delay = maxRetryDelay
 		}
 	}
+
+	worker.mu.Lock()
+	worker.failures++
+	worker.lastFailureAt = time.Now()
+
+	if lastErr != nil {
+		worker.lastError = lastErr.Error()
+	}
+
+	worker.mu.Unlock()
+
+	errorMessage := "unknown transport failure"
+
+	if lastErr != nil {
+		errorMessage = lastErr.Error()
+	}
+
+	t.emit(EventFailure, map[string]any{
+		"peer_id":      worker.id,
+		"address":      worker.address,
+		"message_type": item.message.Type,
+		"request_id":   item.message.RequestID,
+		"attempts":     maxDeliveryAttempts,
+		"error":        errorMessage,
+	})
 
 	return fmt.Errorf(
 		"Raft message delivery failed after %d attempts: %w",

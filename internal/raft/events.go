@@ -31,6 +31,10 @@ const (
 	EventAppendRejected      = "raft.append.rejected"
 	EventReplicationProgress = "raft.replication.progress"
 	EventCommitAdvanced      = "raft.commit.advanced"
+
+	EventHeartbeatSent     = "raft.heartbeat.sent"
+	EventHeartbeatReceived = "raft.heartbeat.received"
+	EventHeartbeatAccepted = "raft.heartbeat.accepted"
 )
 
 func (r *Raft) SetEventHandler(handler EventHandler) {

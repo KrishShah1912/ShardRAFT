@@ -151,6 +151,12 @@ func run(ctx context.Context, cfg config) error {
 		observability.DefaultHistorySize,
 	)
 
+	connectTransportObservability(
+		sender,
+		events,
+		raft.NodeID(cfg.id),
+	)
+
 	node, err := shard.Open(shard.Config{
 		ID:              raft.NodeID(cfg.id),
 		Peers:           peers,
@@ -181,7 +187,12 @@ func run(ctx context.Context, cfg config) error {
 		mux := http.NewServeMux()
 		mux.Handle("/", statusHandler(node))
 		registerRaftHandlers(mux, node)
-		registerAdminHandlers(mux, node, events)
+		registerAdminHandlers(
+			mux,
+			node,
+			events,
+			sender,
+		)
 
 		server = &http.Server{
 			Handler:           mux,

@@ -1,4 +1,11 @@
-import type { EventHistory, NodeStatus } from "../types";
+import type {
+  EventHistory,
+  KVSnapshot,
+  NodeStatus,
+  RaftDebugState,
+  RaftLog,
+  StorageDebug,
+} from "../types";
 
 export const nodeBase = (id: number) => `/node${id}`;
 
@@ -16,12 +23,8 @@ async function request<T>(
   return response.json() as Promise<T>;
 }
 
-export async function getNodeStatus(
-  id: number,
-): Promise<NodeStatus> {
-  return request<NodeStatus>(
-    `${nodeBase(id)}/api/v1/node`,
-  );
+export async function getNodeStatus(id: number): Promise<NodeStatus> {
+  return request<NodeStatus>(`${nodeBase(id)}/api/v1/node`);
 }
 
 export async function getClusterStatuses(): Promise<NodeStatus[]> {
@@ -29,10 +32,7 @@ export async function getClusterStatuses(): Promise<NodeStatus[]> {
     [1, 2, 3].map(async (id) => {
       try {
         const status = await getNodeStatus(id);
-        return {
-          ...status,
-          reachable: true,
-        };
+        return { ...status, reachable: true };
       } catch {
         return {
           id,
@@ -58,6 +58,36 @@ export async function getEventHistory(
   );
 }
 
+export async function getRaftDebug(
+  nodeId: number,
+): Promise<RaftDebugState> {
+  return request<RaftDebugState>(
+    `${nodeBase(nodeId)}/api/v1/admin/raft`,
+  );
+}
+
+export async function getRaftLog(nodeId: number): Promise<RaftLog> {
+  return request<RaftLog>(
+    `${nodeBase(nodeId)}/api/v1/admin/raft/log`,
+  );
+}
+
+export async function getKVSnapshot(
+  nodeId: number,
+): Promise<KVSnapshot> {
+  return request<KVSnapshot>(
+    `${nodeBase(nodeId)}/api/v1/admin/kv`,
+  );
+}
+
+export async function getStorageDebug(
+  nodeId: number,
+): Promise<StorageDebug> {
+  return request<StorageDebug>(
+    `${nodeBase(nodeId)}/api/v1/admin/storage`,
+  );
+}
+
 export async function getKV(
   nodeId: number,
   key: string,
@@ -78,9 +108,7 @@ export async function putKV(
     `${nodeBase(nodeId)}/kv/${encodeURIComponent(key)}`,
     {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         value,
         client_id: clientId,
@@ -100,9 +128,7 @@ export async function deleteKV(
     `${nodeBase(nodeId)}/kv/${encodeURIComponent(key)}`,
     {
       method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         client_id: clientId,
         request_id: requestId,
@@ -123,9 +149,7 @@ export async function casKV(
     `${nodeBase(nodeId)}/kv/${encodeURIComponent(key)}/cas`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         expected,
         value,
@@ -133,5 +157,15 @@ export async function casKV(
         request_id: requestId,
       }),
     },
+  );
+}
+
+export async function getTransportStats(
+  nodeId: number,
+) {
+  return request<
+    import("../types").TransportStats
+  >(
+    `${nodeBase(nodeId)}/api/v1/admin/transport`,
   );
 }
