@@ -44,6 +44,18 @@ func startDaemonGRPCServer(
 		),
 	)
 
+	// Register the Admin Service on the same gRPC listener.
+	// Production shard nodes provide synchronized status snapshots.
+	admin, _ := node.(adminNode)
+
+	shardraftpb.RegisterAdminServiceServer(
+		server,
+		newAdminGRPCServer(
+			defaultShardID,
+			admin,
+		),
+	)
+
 	result := &daemonGRPCServer{
 		server:   server,
 		listener: listener,
