@@ -60,27 +60,43 @@ func submitMutation(
 
 	status, err := node.Status()
 	if err != nil {
-		writeKVError(w, err)
-		return
-	}
-	if status.Role != raft.Leader {
-		writeKVError(w, raft.ErrNotLeader)
+		writeKVError(w, node, err)
 		return
 	}
 
-	result, found, err := node.CheckedRequestResult(command)
-	if err != nil {
-		writeKVError(w, err)
+	if status.Role != raft.Leader {
+		writeRoutingError(
+			w,
+			http.StatusServiceUnavailable,
+			routingCodeNotLeader,
+			"not leader",
+			status,
+		)
 		return
 	}
+
+	// Return the previously applied result for an identical request.
+	result, found, err := node.CheckedRequestResult(command)
+	if err != nil {
+		writeKVError(w, node, err)
+		return
+	}
+
 	if found {
 		writeJSON(w, http.StatusOK, result)
 		return
 	}
 
+	// A proposal is not a commit acknowledgement.
 	err = node.Propose(command)
+
 	if err != nil && !errors.Is(err, shard.ErrRequestPending) {
-		writeKVError(w, err)
+		if errors.Is(err, raft.ErrNotLeader) ||
+			errors.Is(err, kvstore.ErrRequestConflict) {
+			writeKVError(w, node, err)
+		} else {
+			writeUnknownMutation(w, node)
+		}
 		return
 	}
 
@@ -92,10 +108,17 @@ func submitMutation(
 
 	for {
 		result, found, err := node.CheckedRequestResult(command)
+
 		if err != nil {
-			writeKVError(w, err)
+			if errors.Is(err, kvstore.ErrRequestConflict) {
+				writeKVError(w, node, err)
+			} else {
+				writeUnknownMutation(w, node)
+			}
 			return
 		}
+
+		// Acknowledge only a matching applied request.
 		if found {
 			writeJSON(w, http.StatusOK, result)
 			return
@@ -103,12 +126,13 @@ func submitMutation(
 
 		select {
 		case <-r.Context().Done():
+			writeUnknownMutation(w, node)
 			return
+
 		case <-timeout.C:
-			writeJSON(w, http.StatusGatewayTimeout, map[string]any{
-				"error": "commit not confirmed; request outcome unknown",
-			})
+			writeUnknownMutation(w, node)
 			return
+
 		case <-poll.C:
 		}
 	}

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/KrishShah1912/shardraft/internal/kvstore"
 	"github.com/KrishShah1912/shardraft/internal/raft"
@@ -37,12 +36,24 @@ func registerKVHandlers(
 
 		status, err := node.Status()
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			writeRoutingError(
+				w,
+				http.StatusServiceUnavailable,
+				routingCodeUnavailable,
+				err.Error(),
+				raft.Status{},
+			)
 			return
 		}
 
 		if status.Role != raft.Leader {
-			http.Error(w, "not leader", http.StatusServiceUnavailable)
+			writeRoutingError(
+				w,
+				http.StatusServiceUnavailable,
+				routingCodeNotLeader,
+				"not leader",
+				status,
+			)
 			return
 		}
 
@@ -50,7 +61,13 @@ func registerKVHandlers(
 		// in a multi-node deployment.
 		value, found, err := node.Get(key)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			writeRoutingError(
+				w,
+				http.StatusServiceUnavailable,
+				routingCodeUnavailable,
+				err.Error(),
+				raft.Status{},
+			)
 			return
 		}
 
@@ -110,76 +127,55 @@ func registerKVHandlers(
 			return
 		}
 
-		// Require leadership before accepting the write.
-		status, err := node.Status()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusServiceUnavailable)
-			return
-		}
-		if status.Role != raft.Leader {
-			http.Error(w, "not leader", http.StatusServiceUnavailable)
-			return
-		}
-
-		// Check committed requests before proposing.
-		result, found, err := node.CheckedRequestResult(command)
-		if err != nil {
-			writeKVError(w, err)
-			return
-		}
-		if found {
-			writeJSON(w, http.StatusOK, result)
-			return
-		}
-
-		err = node.Propose(command)
-		if err != nil && !errors.Is(err, shard.ErrRequestPending) {
-			writeKVError(w, err)
-			return
-		}
-
-		// A proposal is not an acknowledgement.
-		// Only a matching applied request may return 200.
-		timeout := time.NewTimer(3 * time.Second)
-		defer timeout.Stop()
-
-		poll := time.NewTicker(10 * time.Millisecond)
-		defer poll.Stop()
-
-		for {
-			result, found, err := node.CheckedRequestResult(command)
-			if err != nil {
-				writeKVError(w, err)
-				return
-			}
-			if found {
-				writeJSON(w, http.StatusOK, result)
-				return
-			}
-
-			select {
-			case <-r.Context().Done():
-				return
-			case <-timeout.C:
-				writeJSON(w, http.StatusGatewayTimeout, map[string]any{
-					"error": "commit not confirmed; request outcome unknown",
-				})
-				return
-			case <-poll.C:
-			}
-		}
+		submitMutation(w, r, node, command)
 	})
 }
 
-func writeKVError(w http.ResponseWriter, err error) {
+func writeKVError(
+	w http.ResponseWriter,
+	node *shard.Shard,
+	err error,
+) {
+	status, _ := node.Status()
+
 	switch {
 	case errors.Is(err, kvstore.ErrRequestConflict):
 		http.Error(w, err.Error(), http.StatusConflict)
+
 	case errors.Is(err, shard.ErrRequestPending):
 		http.Error(w, err.Error(), http.StatusConflict)
+
 	case errors.Is(err, raft.ErrNotLeader):
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		writeRoutingError(
+			w,
+			http.StatusServiceUnavailable,
+			routingCodeNotLeader,
+			err.Error(),
+			status,
+		)
+
 	default:
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		writeRoutingError(
+			w,
+			http.StatusServiceUnavailable,
+			routingCodeUnavailable,
+			err.Error(),
+			status,
+		)
 	}
+}
+
+func writeUnknownMutation(
+	w http.ResponseWriter,
+	node *shard.Shard,
+) {
+	status, _ := node.Status()
+
+	writeRoutingError(
+		w,
+		http.StatusGatewayTimeout,
+		routingCodeUnknown,
+		"commit not confirmed; request outcome unknown",
+		status,
+	)
 }

@@ -16,3 +16,24 @@
 - [ ] T2.1–T2.10 pass
 - [ ] T2.11–T2.12 pass across at least 500 seeds
 - [ ] Race detector passes
+
+## Step 7: request routing and integration
+
+- [x] Automatic leader discovery
+- [x] Follower-to-leader request forwarding
+- [x] Bounded request retries
+- [x] Mutation identity preservation
+- [x] Duplicate mutation handling
+- [x] Structured routing errors
+- [x] Frontend automatic routing
+- [x] Backend routing tests
+- [x] Frontend routing tests
+- [x] Live leader failover validation
+- [x] Quorum loss and recovery validation
+- [x] Original persistent storage recovery
+- [x] Teammate implementation integration
+- [x] Full backend regression and race tests
+- [x] Integrated Playwright E2E tests
+- [x] Preliminary throughput and latency benchmarks
+- [x] Request routing documentation
+- [x] Integration validation documentation
