@@ -46,20 +46,36 @@ export default defineConfig({
     ],
   },
 
-  webServer: {
-    command:
-      "npm run dev -- --host 127.0.0.1",
+  webServer: [
+    {
+      command:
+        "../scripts/e2e-supervisor.sh",
 
-    url:
-      "http://127.0.0.1:5173",
+      url:
+        "http://127.0.0.1:8090/health",
 
-    timeout: 30_000,
+      timeout: 60_000,
 
-    reuseExistingServer: true,
+      reuseExistingServer: false,
 
-    stdout: "pipe",
-    stderr: "pipe",
-  },
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+    {
+      command:
+        "npm run dev -- --host 127.0.0.1",
+
+      url:
+        "http://127.0.0.1:5173",
+
+      timeout: 30_000,
+
+      reuseExistingServer: false,
+
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  ],
 
   outputDir:
     "test-results",

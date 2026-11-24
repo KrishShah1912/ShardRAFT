@@ -213,7 +213,6 @@ func run(ctx context.Context, cfg config) error {
 		mux.Handle("/", router)
 
 		registerRaftHandlers(mux, node)
-
 		registerAdminHandlers(
 			mux,
 			node,
