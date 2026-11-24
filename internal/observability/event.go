@@ -46,6 +46,7 @@ const (
 	EventRaftCommitAdvanced      = "raft.commit.advanced"
 	EventRaftHeartbeatSent       = "raft.heartbeat.sent"
 	EventRaftHeartbeatReceived   = "raft.heartbeat.received"
+	EventRaftHeartbeatAccepted   = "raft.heartbeat.accepted"
 	EventRaftEntryAppended       = "raft.entry.appended"
 	EventRaftLogTruncated        = "raft.log.truncated"
 	EventRaftNoopAppended        = "raft.noop.appended"

@@ -33,3 +33,38 @@ reset-cluster: stop-cluster
 
 dev-web:
 	@cd web && npm run dev
+
+.PHONY: stop-node start-node restart-node
+
+stop-node:
+	@if [ -z "$(NODE)" ]; then \
+		echo "Usage: make stop-node NODE=1"; \
+		exit 1; \
+	fi
+	@./scripts/node-control.sh stop "$(NODE)"
+
+start-node:
+	@if [ -z "$(NODE)" ]; then \
+		echo "Usage: make start-node NODE=1"; \
+		exit 1; \
+	fi
+	@./scripts/node-control.sh start "$(NODE)"
+
+restart-node:
+	@if [ -z "$(NODE)" ]; then \
+		echo "Usage: make restart-node NODE=1"; \
+		exit 1; \
+	fi
+	@./scripts/node-control.sh restart "$(NODE)"
+
+.PHONY: dev-supervisor
+
+dev-supervisor:
+	@go run ./cmd/shardraft-supervisor \
+		-root . \
+		-addr 127.0.0.1:8090
+
+.PHONY: dev
+
+dev:
+	@./scripts/dev.sh

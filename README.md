@@ -1170,9 +1170,9 @@ No performance benchmark results are claimed at the current stage.
 
 ### Phase 4 — Backend and Networking
 
-- [ ] Implement real node-to-node communication
-- [ ] Run nodes as independent processes
-- [ ] Build client-facing APIs
+- [x] Implement real node-to-node communication
+- [x] Run nodes as independent processes
+- [x] Build client-facing APIs
 - [ ] Add request routing
 - [ ] Handle leader redirection and retries
 
@@ -1187,12 +1187,12 @@ No performance benchmark results are claimed at the current stage.
 
 ### Phase 6 — Frontend
 
-- [ ] Build React and TypeScript application
-- [ ] Create database explorer
-- [ ] Create query console
-- [ ] Create cluster monitoring dashboard
-- [ ] Add replication visualization
-- [ ] Add failure simulation controls
+- [x] Build React and TypeScript application
+- [x] Create database explorer
+- [x] Create query console
+- [x] Create cluster monitoring dashboard
+- [x] Add replication visualization
+- [x] Add failure simulation controls
 
 ### Phase 7 — Evaluation and Deployment
 

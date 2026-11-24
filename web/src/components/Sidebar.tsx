@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   TerminalSquare,
   Waypoints,
+  Workflow,
 } from "lucide-react";
 import type { Page } from "../types";
 
@@ -35,12 +36,21 @@ const groups: {
         label: "Overview",
         icon: CircleGauge,
       },
+      {
+        page: "architecture",
+        label: "Architecture",
+        icon: Workflow,
+      },
     ],
   },
   {
     title: "CLUSTER",
     items: [
-      { page: "cluster", label: "Cluster", icon: Network },
+      {
+        page: "cluster",
+        label: "Cluster",
+        icon: Network,
+      },
       {
         page: "replication",
         label: "Replication",
@@ -81,7 +91,11 @@ const groups: {
         label: "Transport",
         icon: Waypoints,
       },
-      { page: "shards", label: "Shards", icon: Boxes },
+      {
+        page: "shards",
+        label: "Shards",
+        icon: Boxes,
+      },
     ],
   },
   {
@@ -92,7 +106,11 @@ const groups: {
         label: "Metrics",
         icon: Activity,
       },
-      { page: "events", label: "Events", icon: Radio },
+      {
+        page: "events",
+        label: "Events",
+        icon: Radio,
+      },
     ],
   },
   {
@@ -107,13 +125,17 @@ const groups: {
   },
 ];
 
-export function Sidebar({ page, onChange }: Props) {
+export function Sidebar({
+  page,
+  onChange,
+}: Props) {
   return (
     <aside className="sidebar">
       <div className="brand">
         <div className="brand-mark">
           <Search size={19} />
         </div>
+
         <div>
           <strong>ShardRAFT</strong>
           <span>Distributed Database</span>
@@ -122,9 +144,14 @@ export function Sidebar({ page, onChange }: Props) {
 
       <nav>
         {groups.map((group, index) => (
-          <div className="nav-group" key={index}>
+          <div
+            className="nav-group"
+            key={index}
+          >
             {group.title && (
-              <div className="nav-title">{group.title}</div>
+              <div className="nav-title">
+                {group.title}
+              </div>
             )}
 
             {group.items.map((item) => {
@@ -138,7 +165,9 @@ export function Sidebar({ page, onChange }: Props) {
                       ? "nav-item active"
                       : "nav-item"
                   }
-                  onClick={() => onChange(item.page)}
+                  onClick={() =>
+                    onChange(item.page)
+                  }
                 >
                   <Icon size={17} />
                   <span>{item.label}</span>
@@ -151,6 +180,7 @@ export function Sidebar({ page, onChange }: Props) {
 
       <div className="sidebar-footer">
         <div className="status-dot healthy" />
+
         <div>
           <strong>Local Cluster</strong>
           <span>3-node development</span>
