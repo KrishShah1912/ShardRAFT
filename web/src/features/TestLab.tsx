@@ -28,6 +28,12 @@ import {
 } from "./TestExplorer";
 
 import {
+  getValidationRun,
+  startValidationRun,
+  type ValidationRun,
+} from "../api/validation";
+
+import {
   loadValidationReport,
 } from "../validation/report";
 import type {
@@ -155,6 +161,28 @@ export function TestLab() {
   const [selectedId, setSelectedId] =
     useState(TEST_CATALOG[0].id);
 
+  const [
+    reportAvailable,
+    setReportAvailable,
+  ] = useState(false);
+
+  const [
+    reportLoadError,
+    setReportLoadError,
+  ] = useState("");
+
+  const [
+    validationRun,
+    setValidationRun,
+  ] = useState<ValidationRun>({
+    state: "idle",
+  });
+
+  const [
+    validationActionError,
+    setValidationActionError,
+  ] = useState("");
+
   const [step, setStep] = useState(0);
   const [playing, setPlaying] =
     useState(false);
@@ -186,6 +214,24 @@ export function TestLab() {
       )
     ];
 
+  const refreshValidationReport =
+    async () => {
+      const loaded =
+        await loadValidationReport();
+
+      setValidation(
+        loaded.report,
+      );
+
+      setReportAvailable(
+        loaded.reportAvailable,
+      );
+
+      setReportLoadError(
+        loaded.error ?? "",
+      );
+    };
+
   useEffect(() => {
     const controller =
       new AbortController();
@@ -195,8 +241,18 @@ export function TestLab() {
     loadValidationReport(
       controller.signal,
     )
-      .then((report) => {
-        setValidation(report);
+      .then((loaded) => {
+        setValidation(
+          loaded.report,
+        );
+
+        setReportAvailable(
+          loaded.reportAvailable,
+        );
+
+        setReportLoadError(
+          loaded.error ?? "",
+        );
       })
       .finally(() => {
         setValidationLoading(false);
@@ -206,6 +262,85 @@ export function TestLab() {
       controller.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      validationRun.state !==
+      "running"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const pollValidationRun =
+      async () => {
+        try {
+          const run =
+            await getValidationRun();
+
+          if (cancelled) {
+            return;
+          }
+
+          setValidationRun(
+            run,
+          );
+
+          if (
+            run.state === "passed"
+          ) {
+            await refreshValidationReport();
+            return;
+          }
+
+          if (
+            run.state === "failed"
+          ) {
+            setValidationActionError(
+              run.error ??
+                "Validation failed.",
+            );
+            return;
+          }
+
+          timer =
+            window.setTimeout(
+              pollValidationRun,
+              1000,
+            );
+        } catch (error) {
+          if (cancelled) {
+            return;
+          }
+
+          setValidationActionError(
+            error instanceof Error
+              ? error.message
+              : "Unable to check validation status.",
+          );
+
+          timer =
+            window.setTimeout(
+              pollValidationRun,
+              2000,
+            );
+        }
+      };
+
+    void pollValidationRun();
+
+    return () => {
+      cancelled = true;
+
+      if (timer !== undefined) {
+        window.clearTimeout(
+          timer,
+        );
+      }
+    };
+  }, [validationRun.state]);
 
   useEffect(() => {
     setStep(0);
@@ -342,43 +477,147 @@ export function TestLab() {
         <div className="panel test-summary-card">
           <span>REAL TESTS</span>
           <strong>
-            {validationLoading ? "…" : totalTests}
+            {validationLoading
+              ? "…"
+              : reportAvailable
+                ? totalTests
+                : "—"}
           </strong>
           <small>
-            Backend, frontend and E2E validation
+            Backend and frontend validation
           </small>
         </div>
 
         <div className="panel test-summary-card">
           <span>PASS RATE</span>
           <strong>
-            {validationLoading ? "…" : `${passRate}%`}
+            {validationLoading
+              ? "…"
+              : reportAvailable
+                ? `${passRate}%`
+                : "—"}
           </strong>
-          <small>{passedTests} passing</small>
+          <small>
+            {reportAvailable
+              ? `${passedTests} passing`
+              : "No report generated"}
+          </small>
         </div>
 
         <div className="panel test-summary-card">
           <span>FAILED</span>
-          <strong>{failedTests}</strong>
+          <strong>
+            {validationLoading
+              ? "…"
+              : reportAvailable
+                ? failedTests
+                : "—"}
+          </strong>
           <small>Latest validation run</small>
         </div>
 
         <div className="panel test-summary-card">
           <span>VALIDATION</span>
           <strong>
-            {validation?.status === "passed"
-              ? "PASS"
-              : validation?.status === "failed"
-                ? "FAIL"
-                : "—"}
+            {validationLoading
+              ? "…"
+              : !reportAvailable
+                ? "NOT GENERATED"
+                : validation?.status ===
+                    "passed"
+                  ? "PASS"
+                  : validation?.status ===
+                      "failed"
+                    ? "FAIL"
+                    : "—"}
           </strong>
           <small>
             {validation?.git_commit
               ? `${validation.git_branch} · ${validation.git_commit}`
-              : "No report loaded"}
+              : "Validation not generated"}
           </small>
         </div>
       </div>
+
+      {!validationLoading &&
+        !reportAvailable && (
+          <section className="test-report-missing">
+            <div className="test-report-missing-icon">
+              !
+            </div>
+
+            <div>
+              <strong>
+                {validationRun.state ===
+                "running"
+                  ? "Validation in progress"
+                  : "Validation report not generated"}
+              </strong>
+
+              <p>
+                {validationRun.state ===
+                "running"
+                  ? "Running backend and frontend validation. You can continue exploring Test Lab while the checks complete."
+                  : "Protocol visualizations are still available, but real validation results have not been generated for this checkout."}
+              </p>
+
+              <button
+                type="button"
+                className="test-run-validation"
+                disabled={
+                  validationRun.state ===
+                  "running"
+                }
+                onClick={async () => {
+                  try {
+                    setValidationActionError(
+                      "",
+                    );
+
+                    const run =
+                      await startValidationRun();
+
+                    setValidationRun(
+                      run,
+                    );
+                  } catch (error) {
+                    setValidationActionError(
+                      error instanceof Error
+                        ? error.message
+                        : "Unable to start validation.",
+                    );
+                  }
+                }}
+              >
+                {validationRun.state ===
+                "running"
+                  ? "Running validation..."
+                  : "Run validation"}
+              </button>
+
+              <small>
+                Runs backend and frontend
+                validation in the background.
+              </small>
+
+              <code>
+                CLI: make validation-standard
+              </code>
+
+              {validationActionError && (
+                <small className="test-validation-action-error">
+                  {validationActionError}
+                </small>
+              )}
+
+              {reportLoadError && (
+                <small>
+                  {reportLoadError}
+                </small>
+              )}
+            </div>
+          </section>
+        )}
 
       <section className="panel validation-results-panel">
         <div className="panel-heading">

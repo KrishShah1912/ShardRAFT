@@ -7,13 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "tsc -p tsconfig.test.json && node -e \"require('node:fs').writeFileSync('.test-build/package.json', JSON.stringify({type:'commonjs'}))\" && node --test tests/routing.test.mjs",
+    "test": "tsc -p tsconfig.test.json && node -e \"require('node:fs').writeFileSync('.test-build/package.json', JSON.stringify({type:'commonjs'}))\" && node --test tests/*.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
-    "validation:generate": "python3 ../scripts/generate-validation-report.py",
-    "validation:show": "python3 -m json.tool public/generated/validation-report.json"
+    "validation:generate": "python3 ../scripts/generate-validation-report.py --mode full",
+    "validation:show": "python3 -m json.tool public/generated/validation-report.json",
+    "validation:standard": "python3 ../scripts/generate-validation-report.py --mode standard"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",

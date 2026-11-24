@@ -85,6 +85,16 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	validations :=
+		newValidationManager(
+			absoluteRoot,
+		)
+
+	registerValidationHandlers(
+		mux,
+		validations,
+	)
+
 	benchmarkHistoryPath :=
 		os.Getenv(
 			"SHARDRAFT_BENCHMARK_HISTORY",

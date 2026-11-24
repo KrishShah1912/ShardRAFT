@@ -190,6 +190,29 @@ else
 fi
 
 echo
+if [ ! -f \
+        "$ROOT/web/public/generated/validation-report.json" ]; then
+
+        echo
+        echo "Validation report not found."
+        echo "Test Lab protocol visualizations will still work,"
+        echo "but real test results require:"
+        echo
+        echo "  make validation"
+        echo
+fi
+
+if lsof -tiTCP:5173 -sTCP:LISTEN >/dev/null 2>&1; then
+        echo
+        echo "Error: frontend port 5173 is already in use."
+        echo "Stop the existing frontend before running make dev."
+        echo
+        echo "Check with:"
+        echo "  lsof -nP -iTCP:5173 -sTCP:LISTEN"
+        echo
+        exit 1
+fi
+
 echo "Starting frontend..."
 echo
 

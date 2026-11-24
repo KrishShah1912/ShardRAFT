@@ -159,7 +159,9 @@ export function Sidebar({
         </div>
       </div>
 
-      <nav>
+      <nav
+        aria-label="ShardRAFT navigation"
+      >
         {groups.map((group, index) => (
           <div
             className="nav-group"

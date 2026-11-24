@@ -4,6 +4,12 @@ import type {
   ValidationTest,
 } from "./types";
 
+export interface ValidationReportLoadResult {
+  report: ValidationReport;
+  reportAvailable: boolean;
+  error?: string;
+}
+
 const EMPTY_REPORT: ValidationReport = {
   schema_version: 1,
   generated_at: "",
@@ -96,7 +102,7 @@ export function isValidationReport(
 
 export async function loadValidationReport(
   signal?: AbortSignal,
-): Promise<ValidationReport> {
+): Promise<ValidationReportLoadResult> {
   try {
     const response = await fetch(
       "/generated/validation-report.json",
@@ -107,19 +113,49 @@ export async function loadValidationReport(
     );
 
     if (!response.ok) {
-      return EMPTY_REPORT;
+      return {
+        report: EMPTY_REPORT,
+        reportAvailable: false,
+        error:
+          `Validation report unavailable (HTTP ${response.status}).`,
+      };
     }
 
     const value: unknown =
       await response.json();
 
     if (!isValidationReport(value)) {
-      return EMPTY_REPORT;
+      return {
+        report: EMPTY_REPORT,
+        reportAvailable: false,
+        error:
+          "Validation report has an invalid format.",
+      };
     }
 
-    return value;
-  } catch {
-    return EMPTY_REPORT;
+    return {
+      report: value,
+      reportAvailable: true,
+    };
+  } catch (error) {
+    if (
+      error instanceof DOMException &&
+      error.name === "AbortError"
+    ) {
+      return {
+        report: EMPTY_REPORT,
+        reportAvailable: false,
+      };
+    }
+
+    return {
+      report: EMPTY_REPORT,
+      reportAvailable: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to load validation report.",
+    };
   }
 }
 

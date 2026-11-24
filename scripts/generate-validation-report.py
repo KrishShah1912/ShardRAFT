@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import datetime
 import json
 import pathlib
@@ -368,6 +369,16 @@ def e2e_suite():
     }
 
 def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--mode",
+        choices=("standard", "full"),
+        default="full",
+    )
+
+    args = parser.parse_args()
+
     started = time.perf_counter()
 
     print(
@@ -380,16 +391,18 @@ def main():
     )
     frontend = frontend_suite()
 
-    print(
-        "Running Playwright validation..."
-    )
-    e2e = e2e_suite()
-
     suites = [
         go,
         frontend,
-        e2e,
     ]
+
+    if args.mode == "full":
+        print(
+            "Running Playwright validation..."
+        )
+        suites.append(
+            e2e_suite()
+        )
 
     total = sum(
         suite["passed"]
@@ -415,6 +428,7 @@ def main():
 
     report = {
         "schema_version": 1,
+        "validation_mode": args.mode,
         "generated_at":
             datetime.datetime.now(
                 datetime.timezone.utc
