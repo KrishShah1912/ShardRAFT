@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/KrishShah1912/shardraft/internal/observability"
 	"github.com/KrishShah1912/shardraft/internal/raft"
 	"github.com/KrishShah1912/shardraft/internal/shard"
 	"github.com/KrishShah1912/shardraft/internal/transport"
@@ -146,6 +147,10 @@ func run(ctx context.Context, cfg config) error {
 		return sendRaftMessages(sender, messages)
 	}
 
+	events := observability.NewBus(
+		observability.DefaultHistorySize,
+	)
+
 	node, err := shard.Open(shard.Config{
 		ID:              raft.NodeID(cfg.id),
 		Peers:           peers,
@@ -153,6 +158,7 @@ func run(ctx context.Context, cfg config) error {
 		WALPath:         walPath,
 		SnapshotPath:    snapshotPath,
 		Send:            send,
+		Events:          events,
 	})
 	if err != nil {
 		return fmt.Errorf("open shard: %w", err)
@@ -175,6 +181,7 @@ func run(ctx context.Context, cfg config) error {
 		mux := http.NewServeMux()
 		mux.Handle("/", statusHandler(node))
 		registerRaftHandlers(mux, node)
+		registerAdminHandlers(mux, node, events)
 
 		server = &http.Server{
 			Handler:           mux,

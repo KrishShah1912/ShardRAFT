@@ -11,6 +11,7 @@ var ErrNotImplemented = errors.New("not implemented yet")
 type Raft struct {
 	id    NodeID
 	peers []NodeID
+	eventHandler EventHandler
 
 	hard     HardState
 	volatile VolatileState

@@ -19,3 +19,11 @@ coverage.txt
 # Generated binaries and backup files
 /shardraft
 *.backup
+
+# Local ShardRAFT development cluster
+.dev-cluster/
+
+# Frontend dependencies and build artifacts
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
