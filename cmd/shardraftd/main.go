@@ -86,9 +86,10 @@ func run(ctx context.Context, cfg config) error {
 	}
 
 	var sender *transport.HTTPTransport
+	var configuredPeers []transport.Peer
 
 	if len(peers) > 0 && cfg.peerAddrs != "" {
-		configuredPeers, err := transport.ParsePeers(cfg.peerAddrs)
+		configuredPeers, err = transport.ParsePeers(cfg.peerAddrs)
 		if err != nil {
 			return fmt.Errorf("parse peer addresses: %w", err)
 		}
@@ -185,8 +186,25 @@ func run(ctx context.Context, cfg config) error {
 		}
 
 		mux := http.NewServeMux()
-		mux.Handle("/", statusHandler(node))
+
+		discovery := newLeaderDiscovery(
+			raft.NodeID(cfg.id),
+			configuredPeers,
+			node.Status,
+		)
+
+		router := newRequestRouter(
+			statusHandler(node),
+			discovery.discover,
+			node.Status,
+		)
+
+		router.verifyLeadership = len(configuredPeers) > 0
+
+		mux.Handle("/", router)
+
 		registerRaftHandlers(mux, node)
+
 		registerAdminHandlers(
 			mux,
 			node,

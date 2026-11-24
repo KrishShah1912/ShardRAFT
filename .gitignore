@@ -9,20 +9,29 @@ coverage.txt
 /data/
 /results/
 /tmp/
+
 # IDE and operating system
 .vscode/
 .DS_Store
-/shardraft*.backup
+
 # Generated binaries and backup files
 /shardraft
+/shardraft-bench
+/shardraft*.backup
 *.backup
+
 # Local ShardRAFT development cluster
 .dev-cluster/
+
 # Frontend dependencies and build artifacts
 web/node_modules/
 web/dist/
 web/*.tsbuildinfo
+
 # Playwright
 web/test-results/
 web/playwright-report/
 web/blob-report/
+
+# Frontend test compilation artifacts
+web/.test-build/

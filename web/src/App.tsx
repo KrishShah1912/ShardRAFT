@@ -325,7 +325,7 @@ export default function App() {
       case "console":
         return (
           <QueryConsole
-            leaderId={leader?.id}
+            nodes={nodes}
             onComplete={refreshEverything}
           />
         );

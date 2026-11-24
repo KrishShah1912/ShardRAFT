@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "rootDir": "./src",
+    "outDir": "./.test-build",
+    "incremental": false
+  },
+  "include": [
+    "src/api/routing.ts",
+    "src/api/client.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".test-build"
+  ]
+}
