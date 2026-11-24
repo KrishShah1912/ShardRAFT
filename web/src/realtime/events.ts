@@ -25,12 +25,19 @@ export function connectEventStream(
     "raft.vote.granted",
     "raft.vote.rejected",
     "raft.leader.elected",
+
     "raft.entry.appended",
     "raft.noop.appended",
+
     "raft.append.sent",
     "raft.append.received",
     "raft.append.accepted",
     "raft.append.rejected",
+
+    "raft.heartbeat.sent",
+    "raft.heartbeat.received",
+    "raft.heartbeat.accepted",
+
     "raft.replication.progress",
     "raft.commit.advanced",
   ];
@@ -44,7 +51,8 @@ export function connectEventStream(
 
         onEvent(event);
       } catch {
-        // Ignore malformed observability events.
+        // Malformed observability events must not break
+        // the dashboard event stream.
       }
     });
   }

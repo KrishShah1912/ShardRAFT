@@ -136,9 +136,21 @@ func TestAppendEntriesEmitsReceivedAndAccepted(t *testing.T) {
 	if !containsEvent(events, EventAppendAccepted) {
 		t.Fatal("expected append accepted event")
 	}
+
+	if containsEvent(events, EventHeartbeatReceived) {
+		t.Fatal(
+			"non-empty AppendEntries must not emit heartbeat received",
+		)
+	}
+
+	if containsEvent(events, EventHeartbeatAccepted) {
+		t.Fatal(
+			"non-empty AppendEntries must not emit heartbeat accepted",
+		)
+	}
 }
 
-func TestAppendEntriesEmitsRejected(t *testing.T) {
+func TestHeartbeatEmitsReceivedAndAccepted(t *testing.T) {
 	r := NewRaft(2, []NodeID{1}, 10)
 
 	var events []Event
@@ -152,20 +164,77 @@ func TestAppendEntriesEmitsRejected(t *testing.T) {
 		From:      1,
 		To:        2,
 		Term:      1,
-		Index:     5,
-		LogTerm:   1,
+		Index:     0,
+		LogTerm:   0,
+		Commit:    0,
 		RequestID: 43,
+		Entries:   nil,
 	})
 	if err != nil {
 		t.Fatalf("step: %v", err)
 	}
 
-	if !containsEvent(events, EventAppendReceived) {
-		t.Fatal("expected append received event")
+	if !containsEvent(events, EventHeartbeatReceived) {
+		t.Fatal("expected heartbeat received event")
+	}
+
+	if !containsEvent(events, EventHeartbeatAccepted) {
+		t.Fatal("expected heartbeat accepted event")
+	}
+
+	if containsEvent(events, EventAppendReceived) {
+		t.Fatal(
+			"empty AppendEntries must not emit append received",
+		)
+	}
+
+	if containsEvent(events, EventAppendAccepted) {
+		t.Fatal(
+			"empty AppendEntries must not emit append accepted",
+		)
+	}
+}
+
+func TestRejectedHeartbeatEmitsHeartbeatReceivedAndAppendRejected(
+	t *testing.T,
+) {
+	r := NewRaft(2, []NodeID{1}, 10)
+
+	var events []Event
+
+	r.SetEventHandler(func(event Event) {
+		events = append(events, event)
+	})
+
+	// Empty AppendEntries means heartbeat traffic, but the
+	// previous index does not exist on this follower, so the
+	// request must still be rejected.
+	err := r.Step(Message{
+		Type:      MsgAppend,
+		From:      1,
+		To:        2,
+		Term:      1,
+		Index:     5,
+		LogTerm:   1,
+		RequestID: 44,
+		Entries:   nil,
+	})
+	if err != nil {
+		t.Fatalf("step: %v", err)
+	}
+
+	if !containsEvent(events, EventHeartbeatReceived) {
+		t.Fatal("expected heartbeat received event")
 	}
 
 	if !containsEvent(events, EventAppendRejected) {
 		t.Fatal("expected append rejected event")
+	}
+
+	if containsEvent(events, EventAppendReceived) {
+		t.Fatal(
+			"empty AppendEntries must not emit append received",
+		)
 	}
 }
 

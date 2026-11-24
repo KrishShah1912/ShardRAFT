@@ -77,7 +77,12 @@ func (r *Raft) sendAppend(peer NodeID) {
 		requestID: lastIndex,
 	}
 
-	r.emit(EventAppendSent, map[string]any{
+	sendEvent := EventAppendSent
+	if len(entries) == 0 {
+		sendEvent = EventHeartbeatSent
+	}
+
+	r.emit(sendEvent, map[string]any{
 		"to":             peer,
 		"request_id":     requestID,
 		"previous_index": prevIndex,
@@ -107,7 +112,12 @@ func (r *Raft) replicate() {
 }
 
 func (r *Raft) handleAppendEntries(msg Message) {
-	r.emit(EventAppendReceived, map[string]any{
+	receiveEvent := EventAppendReceived
+	if len(msg.Entries) == 0 {
+		receiveEvent = EventHeartbeatReceived
+	}
+
+	r.emit(receiveEvent, map[string]any{
 		"from":           msg.From,
 		"request_id":     msg.RequestID,
 		"previous_index": msg.Index,
@@ -244,7 +254,12 @@ func (r *Raft) handleAppendEntries(msg Message) {
 	reply.Reject = false
 	reply.Index = msg.Index + uint64(len(msg.Entries))
 
-	r.emit(EventAppendAccepted, map[string]any{
+	acceptedEvent := EventAppendAccepted
+	if len(msg.Entries) == 0 {
+		acceptedEvent = EventHeartbeatAccepted
+	}
+
+	r.emit(acceptedEvent, map[string]any{
 		"from":       msg.From,
 		"request_id": msg.RequestID,
 		"index":      reply.Index,
