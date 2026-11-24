@@ -4,6 +4,8 @@ import {
   Braces,
   CircleGauge,
   Database,
+  FlaskConical,
+  Gauge,
   GitBranch,
   HardDrive,
   Network,
@@ -114,12 +116,27 @@ const groups: {
     ],
   },
   {
+    title: "VALIDATION",
+    items: [
+      {
+        page: "test-lab",
+        label: "Test Lab",
+        icon: FlaskConical,
+      },
+    ],
+  },
+  {
     title: "EXPERIMENTS",
     items: [
       {
         page: "faults",
         label: "Fault Lab",
         icon: ShieldAlert,
+      },
+      {
+        page: "performance",
+        label: "Performance Lab",
+        icon: Gauge,
       },
     ],
   },

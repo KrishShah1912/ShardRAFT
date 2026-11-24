@@ -19,7 +19,6 @@ import (
 	"github.com/KrishShah1912/shardraft/internal/observability"
 	"github.com/KrishShah1912/shardraft/internal/raft"
 	"github.com/KrishShah1912/shardraft/internal/shard"
-	"github.com/KrishShah1912/shardraft/internal/transport"
 )
 
 type config struct {
@@ -30,6 +29,9 @@ type config struct {
 	electionTimeout int
 	tickInterval    time.Duration
 	httpAddr        string
+	raftTransport   string
+	grpcAddr        string
+	grpcPeerAddrs   string
 }
 
 func parsePeers(value string) ([]raft.NodeID, error) {
@@ -85,46 +87,31 @@ func run(ctx context.Context, cfg config) error {
 		}
 	}
 
-	var sender *transport.HTTPTransport
-
-	if len(peers) > 0 && cfg.peerAddrs != "" {
-		configuredPeers, err := transport.ParsePeers(cfg.peerAddrs)
-		if err != nil {
-			return fmt.Errorf("parse peer addresses: %w", err)
-		}
-
-		if len(configuredPeers) != len(peers) {
-			return errors.New(
-				"peer address count does not match peer count",
-			)
-		}
-
-		expected := make(map[raft.NodeID]bool)
-		for _, peer := range peers {
-			expected[peer] = true
-		}
-
-		for _, peer := range configuredPeers {
-			if !expected[peer.ID] {
-				return fmt.Errorf(
-					"unexpected peer address ID %d",
-					peer.ID,
-				)
-			}
-		}
-
-		sender, err = transport.NewHTTPTransport(
-			configuredPeers,
-			256,
+	transportCfg, err := resolveDaemonTransportConfig(
+		cfg,
+		peers,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"invalid transport configuration: %w",
+			err,
 		)
-		if err != nil {
-			return fmt.Errorf("create transport: %w", err)
-		}
+	}
+
+	configuredPeers := transportCfg.httpPeers
+
+	sender, err := createDaemonTransport(
+		transportCfg,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"create transport: %w",
+			err,
+		)
+	}
+
+	if sender != nil {
 		defer sender.Close()
-	} else if len(peers) == 0 && cfg.peerAddrs != "" {
-		return errors.New(
-			"peer addresses provided without peers",
-		)
 	}
 
 	if err := os.MkdirAll(cfg.dataDir, 0700); err != nil {
@@ -171,9 +158,32 @@ func run(ctx context.Context, cfg config) error {
 	}
 	defer node.Close()
 
+	var grpcErrors <-chan error
+
+	if transportCfg.grpcAddr != "" {
+		grpcServer, err := startDaemonGRPCServer(
+			transportCfg.grpcAddr,
+			node,
+			peers,
+		)
+		if err != nil {
+			return err
+		}
+
+		defer grpcServer.Close()
+
+		grpcErrors = grpcServer.Errors()
+
+		log.Printf(
+			"gRPC server listening on %s",
+			grpcServer.Addr(),
+		)
+	}
+
 	var server *http.Server
 	var listener net.Listener
 	var serverErrors chan error
+	var serverDone chan struct{}
 
 	if cfg.httpAddr != "" {
 		listener, err = net.Listen("tcp", cfg.httpAddr)
@@ -185,7 +195,23 @@ func run(ctx context.Context, cfg config) error {
 		}
 
 		mux := http.NewServeMux()
-		mux.Handle("/", statusHandler(node))
+
+		discovery := newLeaderDiscovery(
+			raft.NodeID(cfg.id),
+			configuredPeers,
+			node.Status,
+		)
+
+		router := newRequestRouter(
+			statusHandler(node),
+			discovery.discover,
+			node.Status,
+		)
+
+		router.verifyLeadership = len(configuredPeers) > 0
+
+		mux.Handle("/", router)
+
 		registerRaftHandlers(mux, node)
 		registerAdminHandlers(
 			mux,
@@ -200,8 +226,11 @@ func run(ctx context.Context, cfg config) error {
 		}
 
 		serverErrors = make(chan error, 1)
+		serverDone = make(chan struct{})
 
 		go func() {
+			defer close(serverDone)
+
 			err := server.Serve(listener)
 			if err != nil &&
 				!errors.Is(err, http.ErrServerClosed) {
@@ -230,7 +259,7 @@ func run(ctx context.Context, cfg config) error {
 				_ = server.Close()
 			}
 
-			<-serverErrors
+			<-serverDone
 		}()
 	}
 
@@ -240,10 +269,11 @@ func run(ctx context.Context, cfg config) error {
 	}
 
 	log.Printf(
-		"ShardRAFT node %d started (peers=%v, data=%s)",
+		"ShardRAFT node %d started (peers=%v, data=%s, transport=%s)",
 		cfg.id,
 		peers,
 		cfg.dataDir,
+		transportCfg.mode,
 	)
 
 	ticker := time.NewTicker(cfg.tickInterval)
@@ -267,6 +297,18 @@ func run(ctx context.Context, cfg config) error {
 			}
 			return errors.New(
 				"HTTP server stopped unexpectedly",
+			)
+
+		case err := <-grpcErrors:
+			if err != nil {
+				return fmt.Errorf(
+					"gRPC server failed: %w",
+					err,
+				)
+			}
+
+			return errors.New(
+				"gRPC server stopped unexpectedly",
 			)
 
 		case err := <-transportErrors:
@@ -336,6 +378,27 @@ func main() {
 		"http-addr",
 		"127.0.0.1:8080",
 		"HTTP status listen address",
+	)
+
+	flag.StringVar(
+		&cfg.raftTransport,
+		"raft-transport",
+		"http",
+		"Raft peer transport: http or grpc",
+	)
+
+	flag.StringVar(
+		&cfg.grpcAddr,
+		"grpc-addr",
+		"",
+		"gRPC server listen address",
+	)
+
+	flag.StringVar(
+		&cfg.grpcPeerAddrs,
+		"grpc-peer-addrs",
+		"",
+		"gRPC peer addresses: 2=127.0.0.1:9092,3=127.0.0.1:9093",
 	)
 
 	flag.Parse()

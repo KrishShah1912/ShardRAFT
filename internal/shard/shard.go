@@ -34,6 +34,9 @@ type Shard struct {
 	store        *kvstore.Store
 	snapshotPath string
 
+	nextReadID   uint64
+	pendingReads map[string]*pendingShardRead
+
 	closed  bool
 	stopped bool
 }
@@ -102,18 +105,28 @@ func Open(cfg Config) (*Shard, error) {
 		)
 	}
 
-	return &Shard{
+	s := &Shard{
 		node:         node,
 		storage:      storage,
 		driver:       driver,
 		store:        store,
 		snapshotPath: snapshotPath,
-	}, nil
+	}
+
+	if err := s.configureReadStates(); err != nil {
+		_ = storage.Close()
+		return nil, fmt.Errorf(
+			"configure read states: %w", err,
+		)
+	}
+
+	return s, nil
 }
 
 func (s *Shard) Tick() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.reconcilePendingReads()
 
 	if s.closed {
 		return ErrClosed
@@ -123,12 +136,13 @@ func (s *Shard) Tick() error {
 	}
 
 	s.node.Tick()
-	return s.driver.Process()
+	return s.processDriver()
 }
 
 func (s *Shard) Step(msg raft.Message) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.reconcilePendingReads()
 
 	if s.closed {
 		return ErrClosed
@@ -141,7 +155,7 @@ func (s *Shard) Step(msg raft.Message) error {
 		return err
 	}
 
-	return s.driver.Process()
+	return s.processDriver()
 }
 
 func (s *Shard) Propose(command kvstore.Command) error {
@@ -152,6 +166,7 @@ func (s *Shard) Propose(command kvstore.Command) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.reconcilePendingReads()
 
 	if s.closed {
 		return ErrClosed
@@ -183,7 +198,7 @@ func (s *Shard) Propose(command kvstore.Command) error {
 		return err
 	}
 
-	return s.driver.Process()
+	return s.processDriver()
 }
 
 func (s *Shard) Get(key string) (string, bool, error) {
@@ -238,5 +253,6 @@ func (s *Shard) Close() error {
 	}
 
 	s.closed = true
+	s.failPendingReads(ErrClosed)
 	return s.storage.Close()
 }

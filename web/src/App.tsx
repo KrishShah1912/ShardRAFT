@@ -29,6 +29,7 @@ import { Cluster } from "./features/Cluster";
 import { Database } from "./features/Database";
 import { Events } from "./features/Events";
 import { FaultLab } from "./features/FaultLab";
+import { PerformanceLab } from "./features/PerformanceLab";
 import { Metrics } from "./features/Metrics";
 import { Overview } from "./features/Overview";
 import { QueryConsole } from "./features/QueryConsole";
@@ -37,6 +38,7 @@ import { Replication } from "./features/Replication";
 import { Shards } from "./features/Shards";
 import { Storage } from "./features/Storage";
 import { Transport } from "./features/Transport";
+import { TestLab } from "./features/TestLab";
 import { connectEventStream } from "./realtime/events";
 
 import type {
@@ -325,7 +327,7 @@ export default function App() {
       case "console":
         return (
           <QueryConsole
-            leaderId={leader?.id}
+            nodes={nodes}
             onComplete={refreshEverything}
           />
         );
@@ -374,6 +376,12 @@ export default function App() {
             onRestart={restartNode}
           />
         );
+
+      case "test-lab":
+        return <TestLab />;
+
+      case "performance":
+        return <PerformanceLab />;
 
       case "shards":
         return (

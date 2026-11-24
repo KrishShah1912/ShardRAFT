@@ -9,8 +9,8 @@ var ErrNotLeader = errors.New("node is not leader")
 var ErrNotImplemented = errors.New("not implemented yet")
 
 type Raft struct {
-	id    NodeID
-	peers []NodeID
+	id           NodeID
+	peers        []NodeID
 	eventHandler EventHandler
 
 	hard     HardState
@@ -34,6 +34,13 @@ type Raft struct {
 
 	nextRequestID uint64
 	pendingAppend map[NodeID]map[uint64]uint64
+
+	// Volatile ReadIndex request tracking.
+	nextReadID   uint64
+	pendingReads map[uint64]*pendingRead
+
+	// Volatile quorum-confirmed read results.
+	completedReads []ReadState
 
 	stableHard HardState
 	stableLog  []Entry
@@ -161,6 +168,7 @@ func (r *Raft) Tick() {
 		if r.volatile.HeartbeatElapsed >= r.heartbeatTimeout {
 			r.volatile.HeartbeatElapsed = 0
 			r.sendHeartbeats()
+			r.retryPendingReads()
 		}
 		return
 	}
@@ -175,6 +183,29 @@ func (r *Raft) Tick() {
 func (r *Raft) Step(msg Message) error {
 	if msg.To != r.id {
 		return errors.New("message addressed to another node")
+	}
+
+	if msg.Type == MsgHeartbeatResp && msg.RequestID == 0 {
+		return nil
+	}
+
+	if (msg.Type == MsgHeartbeat ||
+		msg.Type == MsgHeartbeatResp) && msg.RequestID != 0 {
+		if !r.isReadHeartbeatPeer(msg.From) {
+			return nil
+		}
+	}
+
+	// Validate correlated heartbeat payloads before
+	// allowing them to influence the local term.
+	if (msg.Type == MsgHeartbeat ||
+		msg.Type == MsgHeartbeatResp) && msg.RequestID != 0 {
+		if !validReadHeartbeatPayload(msg) {
+			if msg.Type == MsgHeartbeat {
+				r.handleReadHeartbeat(msg)
+			}
+			return nil
+		}
 	}
 
 	if msg.Term > r.hard.Term {
@@ -196,8 +227,18 @@ func (r *Raft) Step(msg Message) error {
 	case MsgVoteResp:
 		r.handleVoteResponse(msg)
 
-	case MsgHeartbeat, MsgAppend:
+	case MsgHeartbeat:
+		if msg.RequestID != 0 {
+			r.handleReadHeartbeat(msg)
+		} else {
+			r.handleAppend(msg)
+		}
+
+	case MsgAppend:
 		r.handleAppend(msg)
+
+	case MsgHeartbeatResp:
+		r.handleReadHeartbeatResp(msg)
 
 	case MsgAppendResp:
 		r.handleAppendResponse(msg)
@@ -218,14 +259,17 @@ func (r *Raft) Propose(data []byte) error {
 	return nil
 }
 
+// ReadIndex starts a quorum-confirmed read request.
+// Successful admission does not authorize a client read.
 func (r *Raft) ReadIndex(ctx []byte) error {
-	return ErrNotImplemented
+	return r.beginReadIndex(ctx)
 }
 
 // Ready reports changes using absolute Raft indexes.
 func (r *Raft) Ready() Ready {
 	rd := Ready{
-		Messages: make([]Message, len(r.messages)),
+		Messages:   make([]Message, len(r.messages)),
+		ReadStates: cloneReadStates(r.completedReads),
 	}
 
 	for i, msg := range r.messages {

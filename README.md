@@ -345,7 +345,7 @@ sequenceDiagram
 
 This diagram represents the consensus replication flow.
 
-A future database API will acknowledge client writes only after the required durability, commitment, and application conditions are satisfied.
+The database mutation API waits for the committed operation to be applied before returning a successful result.
 
 ---
 
@@ -701,7 +701,7 @@ go build ./...
 
 The build should complete without errors.
 
-**Note:** The current supported verification workflow uses Go tests. A complete interactive database server and browser UI are not yet available.
+**Note:** ShardRAFT now supports a local three-node database cluster and an interactive React dashboard. Run `cd web && npm ci` to install frontend dependencies, then run `make dev` from the repository root. Open http://localhost:5173 to access the dashboard.
 
 ---
 
@@ -893,9 +893,9 @@ Restores node state using persisted logs and snapshots.
 
 ---
 
-## 19. Planned Database Operations
+## 19. Database Operations
 
-The future database will support common key-value operations.
+The current database supports common key-value operations.
 
 ### PUT / SET
 
@@ -925,7 +925,7 @@ DELETE user:101
 
 Conditionally update a key if its current value or version matches an expected value.
 
-These operations will eventually be exposed through a backend API.
+These operations are exposed through the current HTTP backend API.
 
 ### Planned Write Flow
 
@@ -949,7 +949,7 @@ This flow describes the intended durable database behavior.
 4. The system performs the consistency checks required by the selected read mode.
 5. The stored value is returned.
 
-Linearizable reads will require appropriate leadership validation, such as a Raft ReadIndex-style mechanism.
+Quorum-confirmed linearizable reads are implemented through the internal shard ReadIndex API. The existing HTTP GET endpoint does not yet use this mechanism.
 
 ---
 
@@ -1029,9 +1029,9 @@ These features require additional implementation and testing.
 
 ---
 
-## 22. Planned Frontend Dashboard
+## 22. Frontend Dashboard
 
-A major future goal is to make ShardRAFT observable through a web application.
+ShardRAFT includes a React and TypeScript dashboard for database operations, cluster monitoring, and controlled failure experiments.
 
 ### Database Explorer
 
@@ -1128,7 +1128,7 @@ Planned workloads include:
 - Uniform key distribution
 - Skewed or hot-key distribution
 
-No performance benchmark results are claimed at the current stage.
+Preliminary local benchmark results are documented in [Integration Validation](docs/INTEGRATION_VALIDATION.md).
 
 ---
 
@@ -1173,8 +1173,8 @@ No performance benchmark results are claimed at the current stage.
 - [x] Implement real node-to-node communication
 - [x] Run nodes as independent processes
 - [x] Build client-facing APIs
-- [ ] Add request routing
-- [ ] Handle leader redirection and retries
+- [x] Add request routing
+- [x] Handle leader redirection and retries
 
 ### Phase 5 — Sharding
 
@@ -1198,8 +1198,8 @@ No performance benchmark results are claimed at the current stage.
 
 - [x] Add deterministic fault-injection experiments
 - [ ] Add linearizability checking
-- [ ] Benchmark throughput and latency
-- [ ] Measure recovery time
+- [x] Benchmark throughput and latency
+- [x] Measure recovery time
 - [ ] Containerize the system
 - [ ] Build a multi-node Docker Compose deployment
 - [ ] Prepare end-to-end demonstrations
@@ -1212,11 +1212,11 @@ ShardRAFT is under active development.
 
 The following limitations currently apply:
 
-1. The current cluster simulator does not represent a real network deployment.
-2. Independent node processes and production network transport are not yet implemented.
-3. Client-facing database APIs and request routing are not yet complete.
+1. The simulator complements the local HTTP-based cluster but does not reproduce every real network condition.
+2. Independent node processes and HTTP transport are implemented for local development; production network hardening remains future work.
+3. Client-facing KV APIs and automatic leader routing are implemented for a single Raft group. Multi-shard routing remains future work.
 4. Sharding and distributed metadata management remain planned.
-5. The frontend dashboard has not yet been implemented.
+5. The frontend dashboard is implemented, but unresolved mutation state is not guaranteed to survive page reloads or navigation.
 6. Network-based snapshot installation for followers behind the compacted log boundary is not implemented.
 7. Crash recovery and persistence are tested for selected scenarios, not every possible failure or storage fault.
 8. Exhaustive Raft safety and linearizability verification remain future work.
@@ -1306,3 +1306,31 @@ The goal is to make distributed database behavior understandable, observable, an
 ---
 
 **ShardRAFT — Building Distributed Database Systems One Consensus Decision at a Time.**
+
+
+## Implementation and Validation Documentation
+
+- [Request Routing and Leader Redirection](docs/REQUEST_ROUTING.md)
+- [Integration Validation and Benchmark Results](docs/INTEGRATION_VALIDATION.md)
+- [Development Checklist](docs/CHECKLIST.md)
+
+## ReadIndex and Linearizable Reads
+
+ShardRAFT implements quorum-confirmed linearizable reads
+through its internal shard API.
+
+- Current-term commit requirement.
+- Correlated heartbeat quorum confirmation.
+- Applied-index safety barrier.
+- Concurrent reads, cancellation, and bounded deadlines.
+- Leadership-change and recovery protection.
+- No additional Raft log entry for each read.
+
+The public shard API is `GetLinearizable(ctx, key)`.
+The existing local `Get` API remains available.
+
+Client-facing gRPC KV integration is a subsequent milestone.
+The existing HTTP GET endpoint is unchanged.
+
+See [ReadIndex architecture and validation](docs/READ_INDEX.md)
+for implementation details, safety guarantees, and test commands.

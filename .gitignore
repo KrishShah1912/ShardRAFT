@@ -14,10 +14,10 @@ coverage.txt
 .vscode/
 .DS_Store
 
-/shardraft*.backup
-
 # Generated binaries and backup files
 /shardraft
+/shardraft-bench
+/shardraft*.backup
 *.backup
 
 # Local ShardRAFT development cluster
@@ -28,4 +28,17 @@ web/node_modules/
 web/dist/
 web/*.tsbuildinfo
 
-web/dist/
+# Playwright
+web/test-results/
+web/playwright-report/
+web/blob-report/
+
+# Frontend test compilation artifacts
+web/.test-build/
+
+# Local validation reports
+web/public/generated/validation-report.json
+
+# Python cache
+__pycache__/
+*.pyc
