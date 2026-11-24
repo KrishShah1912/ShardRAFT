@@ -29,3 +29,8 @@ web/dist/
 web/*.tsbuildinfo
 
 web/dist/
+
+# Playwright
+web/test-results/
+web/playwright-report/
+web/blob-report/
