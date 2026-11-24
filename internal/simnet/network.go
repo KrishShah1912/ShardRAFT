@@ -10,11 +10,32 @@ import (
 // Messages selected by HoldMessage are retained for later delivery.
 func (c *Cluster) Deliver() error {
 	for round := 0; round < 1000; round++ {
+		c.pruneObsoleteReadStates()
+
 		var messages []raft.Message
+
+		// Collect confirmations before advancing any node.
+		// Queue-capacity errors must not discard messages
+		// from nodes already advanced in this round.
+		for _, id := range c.IDs {
+			node := c.Nodes[id]
+
+			if err := c.collectReadStates(
+				id, node.Ready().ReadStates,
+			); err != nil {
+				return err
+			}
+		}
 
 		for _, id := range c.IDs {
 			node := c.Nodes[id]
 			ready := node.Ready()
+
+			if err := c.acceptCommittedEntries(
+				id, ready.CommittedEntries,
+			); err != nil {
+				return err
+			}
 
 			messages = append(messages, ready.Messages...)
 			node.Advance()

@@ -72,11 +72,24 @@ type HTTPTransport struct {
 	closed bool
 
 	eventHandler EventHandler
+
+	delivery      func(context.Context, outgoing) error
+	closeDelivery func() error
+	closeErr      error
 }
 
 func NewHTTPTransport(
 	peers []Peer,
 	queueSize int,
+) (*HTTPTransport, error) {
+	return newQueuedTransport(peers, queueSize, nil, nil)
+}
+
+func newQueuedTransport(
+	peers []Peer,
+	queueSize int,
+	delivery func(context.Context, outgoing) error,
+	closeDelivery func() error,
 ) (*HTTPTransport, error) {
 	if queueSize <= 0 {
 		return nil, errors.New("queue size must be positive")
@@ -113,6 +126,14 @@ func NewHTTPTransport(
 		}
 	}
 
+	if delivery == nil {
+		t.delivery = t.deliverHTTP
+	} else {
+		t.delivery = delivery
+	}
+
+	t.closeDelivery = closeDelivery
+
 	var wg sync.WaitGroup
 
 	for _, worker := range t.peers {
@@ -126,6 +147,12 @@ func NewHTTPTransport(
 
 	go func() {
 		wg.Wait()
+
+		if t.closeDelivery != nil {
+			t.closeErr = t.closeDelivery()
+		}
+
+		t.client.CloseIdleConnections()
 		close(t.done)
 	}()
 
@@ -308,26 +335,6 @@ func (t *HTTPTransport) deliver(
 	item outgoing,
 	attempt int,
 ) error {
-	payload, err := json.Marshal(item.message)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		"http://"+item.address+"/raft/message",
-		bytes.NewReader(payload),
-	)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set(
-		"Content-Type",
-		"application/json",
-	)
-
 	started := time.Now()
 
 	worker.mu.Lock()
@@ -345,8 +352,7 @@ func (t *HTTPTransport) deliver(
 		) / 1000,
 	})
 
-	resp, err := t.client.Do(req)
-
+	err := t.delivery(ctx, item)
 	latency := time.Since(started)
 
 	if err != nil {
@@ -354,23 +360,6 @@ func (t *HTTPTransport) deliver(
 		worker.lastFailureAt = time.Now()
 		worker.lastError = err.Error()
 		worker.mu.Unlock()
-
-		return err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusAccepted {
-		err := fmt.Errorf(
-			"peer returned HTTP %d",
-			resp.StatusCode,
-		)
-
-		worker.mu.Lock()
-		worker.lastFailureAt = time.Now()
-		worker.lastError = err.Error()
-		worker.mu.Unlock()
-
 		return err
 	}
 
@@ -396,19 +385,57 @@ func (t *HTTPTransport) deliver(
 	return nil
 }
 
+func (t *HTTPTransport) deliverHTTP(
+	ctx context.Context,
+	item outgoing,
+) error {
+	payload, err := json.Marshal(item.message)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		"http://"+item.address+"/raft/message",
+		bytes.NewReader(payload),
+	)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf(
+			"peer returned HTTP %d",
+			resp.StatusCode,
+		)
+	}
+
+	return nil
+}
+
 func (t *HTTPTransport) Close() error {
 	t.mu.Lock()
 
-	if t.closed {
-		t.mu.Unlock()
-		return nil
+	if !t.closed {
+		t.closed = true
+		t.cancel()
 	}
 
-	t.closed = true
-	t.cancel()
 	t.mu.Unlock()
 
 	<-t.done
 
-	return nil
+	return t.closeErr
 }

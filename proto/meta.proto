@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package shardraft.v1;
+
+option go_package = "github.com/KrishShah1912/shardraft/proto;shardraftpb";
+
+message SlotRange {
+  uint32 start_slot = 1;
+  uint32 end_slot = 2;
+}
+
+message ReplicaInfo {
+  uint64 node_id = 1;
+  string address = 2;
+}
+
+message ShardInfo {
+  uint64 shard_id = 1;
+  uint64 epoch = 2;
+  repeated SlotRange slot_ranges = 3;
+  repeated ReplicaInfo replicas = 4;
+  uint64 leader_id = 5;
+}
+
+message ShardMap {
+  uint64 epoch = 1;
+  uint32 total_slots = 2;
+  repeated ShardInfo shards = 3;
+}
+
+message GetShardMapRequest {}
+
+message GetShardMapResponse {
+  ShardMap shard_map = 1;
+}
+
+message GetShardRequest {
+  uint64 shard_id = 1;
+}
+
+message GetShardResponse {
+  ShardInfo shard = 1;
+  bool found = 2;
+}
+
+service MetaService {
+  rpc GetShardMap(GetShardMapRequest)
+      returns (GetShardMapResponse);
+
+  rpc GetShard(GetShardRequest)
+      returns (GetShardResponse);
+}

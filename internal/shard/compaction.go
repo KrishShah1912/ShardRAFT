@@ -17,6 +17,7 @@ var ErrStopped = errors.New("shard stopped; recovery required")
 func (s *Shard) Compact(snapshotPath string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.reconcilePendingReads()
 
 	if s.closed {
 		return ErrClosed
@@ -33,7 +34,7 @@ func (s *Shard) Compact(snapshotPath string) error {
 	}
 
 	// Persist and apply all pending Raft work.
-	if err := s.driver.Process(); err != nil {
+	if err := s.processDriver(); err != nil {
 		return fmt.Errorf("process pending Raft work: %w", err)
 	}
 
@@ -125,5 +126,6 @@ func (s *Shard) Compact(snapshotPath string) error {
 // The shard must be closed and reopened to recover.
 func (s *Shard) stop(err error) error {
 	s.stopped = true
+	s.failPendingReads(ErrStopped)
 	return fmt.Errorf("%w: %v", ErrStopped, err)
 }

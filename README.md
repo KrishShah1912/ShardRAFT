@@ -949,7 +949,7 @@ This flow describes the intended durable database behavior.
 4. The system performs the consistency checks required by the selected read mode.
 5. The stored value is returned.
 
-Linearizable reads will require appropriate leadership validation, such as a Raft ReadIndex-style mechanism.
+Quorum-confirmed linearizable reads are implemented through the internal shard ReadIndex API. The existing HTTP GET endpoint does not yet use this mechanism.
 
 ---
 
@@ -1313,3 +1313,24 @@ The goal is to make distributed database behavior understandable, observable, an
 - [Request Routing and Leader Redirection](docs/REQUEST_ROUTING.md)
 - [Integration Validation and Benchmark Results](docs/INTEGRATION_VALIDATION.md)
 - [Development Checklist](docs/CHECKLIST.md)
+
+## ReadIndex and Linearizable Reads
+
+ShardRAFT implements quorum-confirmed linearizable reads
+through its internal shard API.
+
+- Current-term commit requirement.
+- Correlated heartbeat quorum confirmation.
+- Applied-index safety barrier.
+- Concurrent reads, cancellation, and bounded deadlines.
+- Leadership-change and recovery protection.
+- No additional Raft log entry for each read.
+
+The public shard API is `GetLinearizable(ctx, key)`.
+The existing local `Get` API remains available.
+
+Client-facing gRPC KV integration is a subsequent milestone.
+The existing HTTP GET endpoint is unchanged.
+
+See [ReadIndex architecture and validation](docs/READ_INDEX.md)
+for implementation details, safety guarantees, and test commands.
