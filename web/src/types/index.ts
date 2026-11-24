@@ -120,6 +120,8 @@ export type Page =
   | "metrics"
   | "events"
   | "faults"
+  | "performance"
+  | "test-lab"
   | "shards";
 
 export interface TransportPeerStats {
