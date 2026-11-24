@@ -53,6 +53,8 @@ if curl -fsS \
 else
 	echo "Starting supervisor..."
 
+	export SHARDRAFT_BENCHMARK_HISTORY="$ROOT/.dev-cluster/benchmark-history.json"
+
 	go run ./cmd/shardraft-supervisor \
 		-root "$ROOT" \
 		-addr 127.0.0.1:8090 &

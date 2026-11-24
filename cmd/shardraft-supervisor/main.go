@@ -85,6 +85,27 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	benchmarkHistoryPath :=
+		os.Getenv(
+			"SHARDRAFT_BENCHMARK_HISTORY",
+		)
+
+	if benchmarkHistoryPath == "" {
+		benchmarkHistoryPath =
+			".dev-cluster/benchmark-history.json"
+	}
+
+	benchmarks :=
+		newBenchmarkManager(
+			benchmarkHistoryPath,
+			s,
+		)
+
+	registerBenchmarkHandlers(
+		mux,
+		benchmarks,
+	)
+
 	mux.HandleFunc(
 		"GET /api/v1/control/cluster",
 		s.handleCluster,

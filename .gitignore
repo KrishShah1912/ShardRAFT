@@ -35,3 +35,10 @@ web/blob-report/
 
 # Frontend test compilation artifacts
 web/.test-build/
+
+# Local validation reports
+web/public/generated/validation-report.json
+
+# Python cache
+__pycache__/
+*.pyc
