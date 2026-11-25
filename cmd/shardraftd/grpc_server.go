@@ -65,8 +65,6 @@ func startDaemonGRPCServer(
 		}
 	}
 
-	// Register the KV service on the same gRPC listener.
-	// Production shard nodes implement the complete KV interface.
 	kvNode, _ := node.(kvGRPCNode)
 
 	shardraftpb.RegisterKVServiceServer(
@@ -75,6 +73,24 @@ func startDaemonGRPCServer(
 			defaultShardID,
 			kvNode,
 			peerAddresses,
+		),
+	)
+
+	// Register metadata discovery on the shared gRPC listener.
+	// Use the actual bound port for dynamically allocated ports.
+	localAddress := metaGRPCLocalAddress(
+		address,
+		listener.Addr(),
+	)
+
+	shardraftpb.RegisterMetaServiceServer(
+		server,
+		newMetaGRPCServer(
+			defaultShardID,
+			admin,
+			peers,
+			peerAddresses,
+			localAddress,
 		),
 	)
 
