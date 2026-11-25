@@ -37,3 +37,29 @@
 - [x] Preliminary throughput and latency benchmarks
 - [x] Request routing documentation
 - [x] Integration validation documentation
+
+## Step 7.18.9: gRPC KV service daemon integration
+
+- [x] Register KVService on the production gRPC listener
+- [x] Preserve RaftService and AdminService registration
+- [x] Connect the persistent production shard
+- [x] Configure gRPC leader-address hints
+- [x] Validate peer-address mapping
+- [x] Validate real gRPC CRUD and CAS operations
+- [x] Validate default linearizable reads
+- [x] Validate explicit follower LOCAL reads
+- [x] Validate durable request deduplication
+- [x] Validate three-node gRPC replication
+- [x] Validate automatic production leader failover
+- [x] Validate cross-leader request deduplication
+- [x] Validate mutation safety during quorum loss
+- [x] Validate graceful shutdown and listener cleanup
+- [x] Pass repeated cluster and daemon stress tests
+- [x] Pass complete backend regression
+- [x] Pass complete backend race detection
+- [x] Pass shuffled backend regression
+- [x] Preserve HTTP compatibility
+- [x] Pass frontend unit tests
+- [x] Pass frontend production build
+- [x] Pass existing Playwright browser tests
+- [x] Complete integration documentation

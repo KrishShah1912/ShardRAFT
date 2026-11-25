@@ -24,6 +24,7 @@ func startDaemonGRPCServer(
 	address string,
 	node raftMessageHandler,
 	peers []raft.NodeID,
+	peerAddressMaps ...map[raft.NodeID]string,
 ) (*daemonGRPCServer, error) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
@@ -44,8 +45,6 @@ func startDaemonGRPCServer(
 		),
 	)
 
-	// Register the Admin Service on the same gRPC listener.
-	// Production shard nodes provide synchronized status snapshots.
 	admin, _ := node.(adminNode)
 
 	shardraftpb.RegisterAdminServiceServer(
@@ -53,6 +52,29 @@ func startDaemonGRPCServer(
 		newAdminGRPCServer(
 			defaultShardID,
 			admin,
+		),
+	)
+
+	peerAddresses := make(map[raft.NodeID]string)
+
+	for _, addresses := range peerAddressMaps {
+		for id, peerAddress := range addresses {
+			if id != 0 && peerAddress != "" {
+				peerAddresses[id] = peerAddress
+			}
+		}
+	}
+
+	// Register the KV service on the same gRPC listener.
+	// Production shard nodes implement the complete KV interface.
+	kvNode, _ := node.(kvGRPCNode)
+
+	shardraftpb.RegisterKVServiceServer(
+		server,
+		newKVGRPCServer(
+			defaultShardID,
+			kvNode,
+			peerAddresses,
 		),
 	)
 

@@ -332,3 +332,143 @@ This step does not implement:
 - Network snapshot installation
 
 The initial shard and epoch configuration is static.
+
+## 20. Production Daemon Integration
+
+KVService is registered on the existing daemon gRPC
+listener alongside RaftService and AdminService.
+
+The production daemon supplies the persistent shard
+instance directly to the KV service implementation.
+
+Configured gRPC peer addresses are converted into a
+node-ID-to-address map for leader routing hints.
+
+HTTP peer addresses are never substituted for gRPC
+leader addresses.
+
+Existing HTTP endpoints, transport configuration,
+daemon lifecycle, and graceful shutdown are preserved.
+
+### Integration Files
+
+- cmd/shardraftd/grpc_server.go
+- cmd/shardraftd/main.go
+- cmd/shardraftd/kv_grpc_peers.go
+- cmd/shardraftd/kv_grpc_peers_test.go
+- cmd/shardraftd/kv_grpc_integration_test.go
+- cmd/shardraftd/kv_grpc_cluster_test.go
+- cmd/shardraftd/kv_grpc_daemon_test.go
+
+## 21. Integration Validation Results
+
+Validation was completed on November 25, 2026.
+
+| Validation | Result |
+|---|---|
+| gRPC peer-address mapping | 5/5 passed |
+| Single-node wire integration | 9/9 passed |
+| Three-node gRPC cluster integration | 6/6 passed |
+| Production daemon integration | 3/3 passed |
+| Targeted cluster repeated executions | 156/156 passed |
+| Production daemon stress executions | 30/30 passed |
+| Complete backend regression | 13/13 packages passed |
+| Complete backend race detection | 13/13 packages passed |
+| Shuffled backend regression | 13/13 packages passed |
+| HTTP compatibility regression | Passed |
+| Request retry and failover regression | Passed |
+| Frontend unit tests | 25/25 passed |
+| Frontend Playwright tests | 3/3 passed |
+| Backend build | Passed |
+| Frontend production build | Passed |
+| Go vet | Passed |
+| Go module verification | Passed |
+| Go formatting | Passed |
+| Whitespace validation | Passed |
+
+No race conditions were reported during the executed
+race-enabled test suites.
+
+## 22. Distributed Integration Coverage
+
+The three-node integration tests verify:
+
+- Replicated mutations through real gRPC clients.
+- Linearizable reads through the elected leader.
+- Follower rejection of leader-only operations.
+- Configured leader-address hints.
+- Explicit follower LOCAL reads.
+- Request deduplication across leadership changes.
+- Read availability with one unavailable follower.
+- Linearizable read rejection during quorum loss.
+- Read recovery after quorum restoration.
+
+Production daemon tests additionally verify:
+
+- Shared Raft, Admin, and KV gRPC listeners.
+- HTTP and gRPC service coexistence.
+- Automatic leader election after graceful shutdown.
+- Cross-leader mutation deduplication.
+- Mutation acknowledgement safety during quorum loss.
+- Unchanged commit and applied indexes during the
+  tested isolated mutation.
+- Graceful shutdown and listener cleanup.
+
+## 23. Frontend Compatibility
+
+All 25 frontend unit tests and all three existing
+Playwright browser tests passed.
+
+The browser tests covered:
+
+- Dashboard and cluster availability.
+- Single-node failure tolerance.
+- Automatic leader failover.
+- Continued writes after leader replacement.
+- Recovery of the former leader.
+
+Observed browser failover results:
+
+| Metric | Observed Result |
+|---|---|
+| Original leader | Node 1 |
+| Original term | 9 |
+| Replacement leader | Node 3 |
+| Replacement term | 10 |
+| Observed failover | 3037 ms |
+| Initial write commit index | 18 |
+| Post-failover commit index | 20 |
+| Former leader recovery | Successful |
+
+These observations describe one browser test execution
+and are not a controlled performance benchmark.
+
+No frontend source changes were required.
+
+## 24. Safety and Validation Limitations
+
+Passing integration tests does not constitute a formal
+proof of Raft safety or linearizability.
+
+The production quorum-loss test confirmed that an
+unconfirmed mutation was not acknowledged as successful.
+
+OUTCOME_UNKNOWN does not guarantee that a mutation
+will never commit. A subsequent retry must preserve
+the original client ID, request ID, and command payload.
+
+Production daemon failover tests use graceful shutdown.
+Abrupt process termination and uncertain mutation retry
+after production quorum restoration require additional
+validation.
+
+The browser tests exercise the existing HTTP-based
+frontend rather than direct browser gRPC communication.
+
+Production integration tests use temporary storage.
+The browser test output alone does not establish that
+original development storage remained unchanged.
+
+Automatic gRPC client retries, gateway integration,
+dynamic shard discovery, and multi-shard routing remain
+outside the scope of this integration milestone.

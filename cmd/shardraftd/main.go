@@ -165,6 +165,7 @@ func run(ctx context.Context, cfg config) error {
 			transportCfg.grpcAddr,
 			node,
 			peers,
+			kvGRPCPeerAddresses(transportCfg.grpcPeers),
 		)
 		if err != nil {
 			return err
