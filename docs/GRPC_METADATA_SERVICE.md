@@ -276,7 +276,7 @@ The following capabilities remain future work:
 - Persistent metadata configuration.
 - Routing epoch advancement after ownership changes.
 - Explicit advertised-address configuration for wildcard listeners.
-- Client-side hash-slot routing and metadata refresh.
+- Dynamic ownership changes across multiple physical shards.
 
 The current validation also has the following boundaries:
 
@@ -299,6 +299,11 @@ Clients can discover static shard ownership, replica membership,
 gRPC endpoints, routing epochs, and observed leader information
 through the shared production gRPC listener.
 
-The implementation establishes the metadata foundation required
-for subsequent client-side routing, leader-aware retries,
-and future multi-shard support.
+The metadata service is consumed by the shard-aware gRPC client
+implemented in Step 7.20. Client-side hash-slot routing, metadata
+refresh, leader-aware retries, and unified KV operations are
+implemented and validated.
+
+See [GRPC_CLIENT.md](GRPC_CLIENT.md) for complete client documentation.
+
+Physical multi-shard support remains future work.
