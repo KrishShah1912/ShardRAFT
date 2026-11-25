@@ -79,7 +79,7 @@
 - [x] Validate distributed metadata discovery and leader failover.
 - [x] Complete backend regression, race and coverage validation.
 - [x] Complete metadata service documentation.
-- [ ] Commit, push and merge the metadata service pull request.
+- [x] Commit, push and merge the metadata service pull request (PR #13).
 
 ### Validation Summary
 
@@ -95,3 +95,41 @@
 
 See [GRPC_METADATA_SERVICE.md](GRPC_METADATA_SERVICE.md)
 for architecture, RPC behavior, validation results and limitations.
+
+
+## Step 7.20 - Shard-Aware gRPC Client
+
+- [x] 7.20.1 Inspect existing client infrastructure.
+- [x] 7.20.2 Implement CRC32 hash-slot calculation.
+- [x] 7.20.3 Implement shard map validation and slot lookup.
+- [x] 7.20.4 Implement thread-safe metadata caching.
+- [x] 7.20.5 Implement gRPC connection management.
+- [x] 7.20.6 Implement leader-aware request routing.
+- [x] 7.20.7 Implement metadata refresh on WRONG_SHARD.
+- [x] 7.20.8 Implement bounded retries and stable mutation identities.
+- [x] 7.20.9 Implement unified shard-aware KV operations.
+- [x] 7.20.10 Complete dedicated client unit testing.
+- [x] 7.20.11 Complete distributed integration testing.
+- [x] 7.20.12 Complete final regression and documentation.
+- [x] Merge client implementation into main through PR #13.
+
+### Validation Summary
+
+- 14 unified client tests passed.
+- 700 repeated unified client test executions passed.
+- 12 distributed integration tests passed.
+- 120 repeated distributed integration test executions passed.
+- 92.5% client unit-test package coverage.
+- 93.9% combined client statement coverage.
+- 42 backend package test executions passed.
+- 25 frontend unit tests passed.
+- Backend and frontend builds passed.
+- Static analysis and module verification passed.
+- Protobuf contracts and module dependencies preserved.
+
+Browser E2E tests were not rerun for this milestone.
+
+See [GRPC_CLIENT.md](GRPC_CLIENT.md) for implementation
+details, validation results, and remaining limitations.
+
+Physical sharding and multiple Raft groups remain future work.

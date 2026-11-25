@@ -41,9 +41,9 @@ Testing covers simulated network partitions, selective message loss,
 delayed and reordered replication responses, restart recovery,
 and deterministic randomized fault workloads.
 
-**Important:** ShardRAFT remains under active development. Real node-to-node
-networking, client-facing APIs, distributed sharding, and the frontend
-dashboard are future development stages. The current tests do not constitute
+**Important:** ShardRAFT implements real networking, HTTP and gRPC APIs,
+a React dashboard, metadata discovery, and shard-aware client routing.
+Physical sharding remains future work. The current tests do not constitute
 a proof of correctness under all possible failures.
 
 ---
@@ -1329,8 +1329,51 @@ through its internal shard API.
 The public shard API is `GetLinearizable(ctx, key)`.
 The existing local `Get` API remains available.
 
-Client-facing gRPC KV integration is a subsequent milestone.
+Client-facing gRPC KV integration is implemented.
 The existing HTTP GET endpoint is unchanged.
 
 See [ReadIndex architecture and validation](docs/READ_INDEX.md)
 for implementation details, safety guarantees, and test commands.
+
+
+## gRPC Metadata and Client Routing
+
+Steps 7.19 and 7.20 implement:
+
+- gRPC metadata discovery.
+- CRC32 logical hash-slot calculation.
+- Thread-safe metadata caching.
+- Reusable gRPC connections.
+- Leader-aware request routing.
+- Metadata refresh on WRONG_SHARD.
+- Bounded retries and stable mutation identities.
+- Default linearizable reads.
+- Unified GET, PUT, DELETE, and CAS operations.
+
+The current deployment contains one Raft group owning all
+65,536 logical hash slots.
+
+### Final Validation
+
+| Validation | Result |
+|---|---|
+| Unified client tests | 14/14 passed |
+| Repeated client tests | 700/700 passed |
+| Distributed integration tests | 12/12 passed |
+| Repeated distributed tests | 120/120 passed |
+| Combined client statement coverage | 93.9% |
+| Backend package test executions | 42/42 passed |
+| Frontend unit tests | 25/25 passed |
+| Backend and frontend builds | Passed |
+| Static analysis and module verification | Passed |
+
+Browser E2E tests were not rerun for this milestone.
+
+### Documentation
+
+- [gRPC KV Service](docs/GRPC_KV_SERVICE.md)
+- [gRPC Metadata Service](docs/GRPC_METADATA_SERVICE.md)
+- [Shard-Aware gRPC Client](docs/GRPC_CLIENT.md)
+
+Physical sharding, multiple Raft groups, dynamic ownership,
+and shard rebalancing remain future work.
