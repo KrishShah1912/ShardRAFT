@@ -1693,3 +1693,22 @@ and opt-in Docker integration and fault tests.
 
 See [Local Deployment Guide](docs/DEPLOYMENT.md)
 for configuration, usage, validation and limitations.
+
+## Correctness and Performance Evaluation
+
+ShardRAFT includes evaluation tools for recording operation histories,
+checking single-key linearizability with Porcupine, generating configurable
+uniform and Zipfian workloads, and measuring throughput, latency,
+failover, recovery, and isolated WAL synchronization costs.
+
+```bash
+./scripts/run_experiments.sh --dry-run
+./scripts/run_experiments.sh smoke
+./scripts/run_experiments.sh full
+```
+
+See [Correctness and Performance Evaluation](docs/PERFORMANCE.md)
+for reproduction commands, measured results, raw artifact descriptions,
+and measurement limitations.
+
+Generated experiment results are stored under `results/`.
