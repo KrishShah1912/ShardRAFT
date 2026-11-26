@@ -349,4 +349,26 @@ See [Multi-Raft Acceptance](MULTI_RAFT_ACCEPTANCE.md).
 - [x] Verify follower loss and replica recovery.
 - [x] Complete final deployment validation.
 - [x] Complete deployment documentation.
-- [ ] Merge local Docker deployment pull request.
+- [x] Merge local Docker deployment pull request.
+
+## Step 10: Correctness and Performance Acceptance
+
+- [x] Concurrent operation history recording.
+- [x] Porcupine single-key linearizability checker.
+- [x] Configurable benchmark CLI.
+- [x] Uniform and Zipfian key selection.
+- [x] Configurable record sizes and read/write ratios.
+- [x] Automated experiment runner.
+- [x] Eight workload experiments and 8,000 successful operations.
+- [x] Eight linearizable recorded histories.
+- [x] Raw CSV generation and validation.
+- [x] Throughput and p50/p95/p99 latency measurements.
+- [x] Docker leader failover and replica recovery measurements.
+- [x] Isolated WAL synchronization cost comparison.
+- [x] Explicit weaker durability labels for timed and no-sync modes.
+- [x] Performance documentation and reproduction instructions.
+- [x] Repository build, go vet, and focused race tests passed.
+- [ ] Complete repository race suite (Step 11 CI).
+- [ ] Step 10 pull request reviewed and merged.
+
+See `docs/PERFORMANCE.md` for measurement limitations.
