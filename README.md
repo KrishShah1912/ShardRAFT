@@ -1669,3 +1669,27 @@ The existing single-shard mode remains available.
 
 See [Multi-Raft Acceptance](docs/MULTI_RAFT_ACCEPTANCE.md)
 for implementation details, validation results and limitations.
+
+## Local Docker Deployment
+
+ShardRAFT supports a local Docker Compose deployment
+with five multi-Raft storage nodes, two HTTP gateways,
+independent persistent volumes and storage health checks.
+
+Start the deployment:
+
+```bash
+docker compose up -d --build --wait
+docker compose ps
+```
+
+Gateway endpoints:
+
+- Gateway 1: `http://127.0.0.1:18091`
+- Gateway 2: `http://127.0.0.1:18092`
+
+The deployment includes a host-side `chaosctl` CLI
+and opt-in Docker integration and fault tests.
+
+See [Local Deployment Guide](docs/DEPLOYMENT.md)
+for configuration, usage, validation and limitations.

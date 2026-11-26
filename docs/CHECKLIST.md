@@ -326,6 +326,27 @@ remain future work.
 - [x] Validate end-to-end operations across four shards.
 - [x] Document implementation and limitations.
 - [x] Complete final repository validation.
-- [ ] Merge multi-Raft implementation pull request.
+- [x] Merge multi-Raft implementation pull request.
 
 See [Multi-Raft Acceptance](MULTI_RAFT_ACCEPTANCE.md).
+
+## Step 9 Acceptance: Local Docker Deployment
+
+- [x] Create multi-stage Dockerfile and dockerignore.
+- [x] Build and verify shared runtime image.
+- [x] Create Docker Compose configuration.
+- [x] Configure five storage nodes and two gateways.
+- [x] Configure independent persistent volumes.
+- [x] Configure storage node health checks.
+- [x] Validate live container startup and networking.
+- [x] Implement and test chaos control CLI.
+- [x] Implement opt-in Docker integration tests.
+- [x] Verify routing across all four shards.
+- [x] Verify cross-gateway operations and deduplication.
+- [x] Implement leader and follower failure tests.
+- [x] Verify leader replacement and committed values.
+- [x] Verify duplicate request retry after failover.
+- [x] Verify follower loss and replica recovery.
+- [x] Complete final deployment validation.
+- [x] Complete deployment documentation.
+- [ ] Merge local Docker deployment pull request.
