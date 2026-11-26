@@ -1581,3 +1581,58 @@ Browser E2E tests were not rerun for this milestone.
 See [HTTP-gRPC Gateway](docs/HTTP_GRPC_GATEWAY.md)
 for configuration, API examples, architecture,
 error handling, and reproducible validation commands.
+
+## gRPC Command-Line Client
+
+Step 7.22 introduces a standalone command-line client backed
+by the shard-aware gRPC client.
+
+### Implemented Features
+
+- GET, PUT, DELETE, and compare-and-swap.
+- Automatic metadata discovery and leader-aware routing.
+- Linearizable reads by default and explicit local reads.
+- JSON and human-readable text output.
+- Configurable bootstrap endpoints and operation deadlines.
+- Automatic and explicit mutation identities.
+- Durable deduplication and uncertain mutation recovery.
+- Structured exit codes and graceful cancellation.
+
+### Build and Usage
+
+```bash
+mkdir -p bin
+go build -o bin/shardraft ./cmd/shardraft
+
+./bin/shardraft --help
+./bin/shardraft put balance 100
+./bin/shardraft get balance
+./bin/shardraft cas balance 100 200
+./bin/shardraft delete balance
+```
+
+These operations require a running gRPC-enabled cluster.
+
+### CLI Validation
+
+| Validation | Result |
+|---|---|
+| Unit test functions | 127 |
+| Distributed test functions | 30 |
+| Final distributed normal executions | 150/150 passed |
+| Final distributed race executions | 60/60 passed |
+| CLI unit statement coverage | 98.1% |
+| Final repository package regression | 17/17 passed |
+| Build, static analysis, and module verification | Passed |
+
+Distributed validation covers CRUD, CAS, bootstrap discovery,
+leader failover, durable deduplication, quorum loss, recovery,
+and concurrent operations.
+
+The existing backend, gateway, protobuf contracts, and Go
+module dependencies remain unchanged by this milestone.
+
+Physical multi-shard deployment remains future work.
+
+See [ShardRAFT gRPC CLI](docs/GRPC_CLI.md) for configuration,
+command examples, exit codes, mutation recovery, and limitations.
