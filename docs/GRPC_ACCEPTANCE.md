@@ -148,4 +148,7 @@ The scoped gRPC integration requirements have been
 implemented and validated.
 
 Final cross-component acceptance passed.
-Step 7 repository closure is pending the final PR merge.
+The final integration pull request (#21) was merged
+into main at commit c30532c.
+
+Step 7 implementation and scoped acceptance are complete.
