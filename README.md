@@ -616,6 +616,18 @@ ShardRAFT/
 |   |   |-- replication_test.go
 |   |   |-- Additional Raft implementation and tests
 |   |
+|   |-- meta/
+|   |   |-- slot.go
+|   |   |-- shardmap.go
+|   |   |-- statemachine.go
+|   |   |-- Slot, shard map and metadata tests
+|   |
+|   |-- shard/
+|   |   |-- router.go
+|   |   |-- group.go
+|   |   |-- dispatcher.go
+|   |   |-- Existing shard implementation and tests
+|   |
 |   |-- simnet/
 |       |-- Cluster simulation implementation
 |       |-- cluster_test.go
@@ -638,6 +650,28 @@ Responsibilities include:
 - Log replication
 - Commit tracking
 - Request-response handling
+
+### internal/meta
+
+Contains the sharding and metadata primitives.
+
+Responsibilities include:
+
+- Deterministic key-to-slot hashing
+- The versioned shard map and its validation
+- The metadata state machine for shard map updates
+- Shard map snapshot and restore
+
+### internal/shard
+
+Contains the existing shard implementation and the routing additions.
+
+Responsibilities include:
+
+- Mapping keys to their slot, owning group, and replicas
+- Typed wrong-shard ownership checks
+- An ownership-enforcing group wrapper around a shard
+- A dispatcher that routes requests to the local owning group
 
 ### internal/simnet
 
@@ -825,6 +859,19 @@ Additional verified test coverage includes:
 - KV snapshot restoration and log compaction
 - Deterministic randomized fault testing
 
+Sharding and metadata test coverage includes:
+
+- A key always maps to the same slot, within range
+- Every slot has exactly one owner, with correct boundaries
+- Keys spread across all four shards
+- Shard map validation of gaps, overlaps, invalid ranges and replicas
+- A deterministic metadata state machine
+- Rejection of stale, non-consecutive, invalid and unknown commands
+- Metadata snapshot and restore
+- Key routing to the owning group and typed wrong-shard errors
+- Ownership that follows shard map updates
+- Dispatch to the local owning group and not-local errors
+
 The extended stress test exercises 100 seeds with 100 operations per seed.
 These tests cover selected failure scenarios rather than every possible
 distributed-system execution.
@@ -955,22 +1002,48 @@ Quorum-confirmed linearizable reads are implemented through the internal shard R
 
 ## 20. Planned Data Sharding
 
-The original architecture proposes dividing the key space into **65,536 logical hash slots**.
+The architecture divides the key space into **65,536 logical hash slots**.
 
 Each key maps deterministically to a slot.
 
-Each shard owns a range of slots.
+Each shard owns a contiguous range of slots.
 
-For example:
+The four-shard layout and its replica placement are:
 
-| Shard | Example slot range |
-|---|---|
-| Shard 1 | 0–16383 |
-| Shard 2 | 16384–32767 |
-| Shard 3 | 32768–49151 |
-| Shard 4 | 49152–65535 |
+| Shard | Slot range | Replicas |
+|---|---|---|
+| Shard 1 | 0–16383 | n1, n2, n3 |
+| Shard 2 | 16384–32767 | n2, n3, n4 |
+| Shard 3 | 32768–49151 | n3, n4, n5 |
+| Shard 4 | 49152–65535 | n4, n5, n1 |
 
-These ranges illustrate the proposed four-shard distribution.
+A separate metadata group (replicas n1, n2, n3) holds the shard map.
+
+### Implemented Sharding Components
+
+The in-process sharding and metadata primitives are implemented and
+tested in `internal/meta` and `internal/shard`:
+
+- **Slot mapping** — `SlotForKey` hashes a key with CRC32 IEEE modulo
+  65,536, deterministically and stably.
+- **Shard map** — a versioned `ShardMap` with validation that enforces
+  contiguous ranges with no gaps or overlaps, every slot owned once,
+  and valid unique replicas.
+- **Metadata state machine** — applies `SET_SHARD_MAP` commands with an
+  expected version, requires the new version to be the current version
+  plus one, leaves state unchanged on rejection, and supports snapshot
+  and restore.
+- **Router** — maps a key to its slot, owning group, and replicas.
+- **Ownership checks** — a typed wrong-shard error that names the real
+  owning group and its replicas.
+- **Group** — a wrapper around an existing shard that rejects keys it
+  does not own, checking the current map on every call.
+- **Dispatcher** — routes each request to the local group owning the
+  key, and returns a not-local error with the replica list otherwise.
+
+Live multi-group Raft deployment and wiring these components into the
+HTTP and gRPC servers remain planned. See
+[Sharding and the Metadata Group](docs/SHARDING.md) for details.
 
 ### Why Hash-Based Sharding?
 
@@ -985,7 +1058,9 @@ A limitation is that hashing does not preserve natural key ordering, making orde
 
 ### Replication Per Shard
 
-Each shard is intended to have its own Raft group.
+Each shard is intended to have its own Raft group. The current work
+defines the shard map and routing; running a live Raft group per shard
+remains planned.
 
 A three-replica group can tolerate one unavailable replica while retaining a majority, assuming the remaining replicas can communicate and have the required durable state.
 
@@ -1178,11 +1253,12 @@ Preliminary local benchmark results are documented in [Integration Validation](d
 
 ### Phase 5 — Sharding
 
-- [ ] Implement hash-slot partitioning
-- [ ] Introduce multiple Raft groups
-- [ ] Implement metadata management
-- [ ] Add shard-aware routing
-- [ ] Test data distribution
+- [x] Implement hash-slot partitioning
+- [x] Implement the metadata state machine
+- [x] Add shard routing logic
+- [ ] Introduce multiple live Raft groups
+- [ ] Wire routing into the HTTP and gRPC servers
+- [ ] Test live data distribution
 - [ ] Explore shard rebalancing
 
 ### Phase 6 — Frontend
@@ -1214,8 +1290,8 @@ The following limitations currently apply:
 
 1. The simulator complements the local HTTP-based cluster but does not reproduce every real network condition.
 2. Independent node processes and HTTP transport are implemented for local development; production network hardening remains future work.
-3. Client-facing KV APIs and automatic leader routing are implemented for a single Raft group. Multi-shard routing remains future work.
-4. Sharding and distributed metadata management remain planned.
+3. Client-facing KV APIs and automatic leader routing are implemented for a single Raft group. Multi-shard routing at the server level remains future work.
+4. The sharding primitives — slot mapping, the versioned shard map, the metadata state machine, the router, ownership checks, and the dispatcher — are implemented and tested in process. Live multi-group Raft deployment and wiring these components into the HTTP and gRPC servers remain planned.
 5. The frontend dashboard is implemented, but unresolved mutation state is not guaranteed to survive page reloads or navigation.
 6. Network-based snapshot installation for followers behind the compacted log boundary is not implemented.
 7. Crash recovery and persistence are tested for selected scenarios, not every possible failure or storage fault.
@@ -1312,6 +1388,7 @@ The goal is to make distributed database behavior understandable, observable, an
 
 - [Request Routing and Leader Redirection](docs/REQUEST_ROUTING.md)
 - [Integration Validation and Benchmark Results](docs/INTEGRATION_VALIDATION.md)
+- [Sharding and the Metadata Group](docs/SHARDING.md)
 - [Development Checklist](docs/CHECKLIST.md)
 
 ## ReadIndex and Linearizable Reads
