@@ -368,7 +368,22 @@ See [Multi-Raft Acceptance](MULTI_RAFT_ACCEPTANCE.md).
 - [x] Explicit weaker durability labels for timed and no-sync modes.
 - [x] Performance documentation and reproduction instructions.
 - [x] Repository build, go vet, and focused race tests passed.
-- [ ] Complete repository race suite (Step 11 CI).
-- [ ] Step 10 pull request reviewed and merged.
+- [x] Complete repository race suite passed locally (Step 11).
+- [x] Step 10 pull request merged (PR #25).
 
 See `docs/PERFORMANCE.md` for measurement limitations.
+
+## Step 11: CI and Final Repository Validation
+
+- [x] Synchronize main after Step 10 merge.
+- [x] Create final CI feature branch.
+- [x] Create GitHub Actions CI workflow.
+- [x] Configure Go version from go.mod.
+- [x] Configure dependency caching and verification.
+- [x] Configure repository build.
+- [x] Configure repository-wide go vet.
+- [x] Configure complete repository race tests.
+- [x] Pass final repository build and static analysis.
+- [x] Pass complete repository race tests.
+- [ ] Verify successful GitHub Actions execution.
+- [ ] Complete final teammate review and PR merge.
