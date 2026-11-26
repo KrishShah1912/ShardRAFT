@@ -271,7 +271,7 @@ deployment. Physical multi-shard deployment remains future work.
 
 - [x] Create final gRPC acceptance report.
 - [x] Update README and implementation checklist.
-- [ ] Merge final integration pull request.
+- [x] Merge final integration pull request.
 
 ## Step 8 - Sharding and the Metadata Group
 
