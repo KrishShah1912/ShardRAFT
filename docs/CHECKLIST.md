@@ -202,6 +202,54 @@ and exhaustive crash recovery verification remain
 future work.
 
 
+## Step 7.22 - gRPC Command-Line Client
+
+- [x] 7.22.1 Implement CLI configuration and command parsing.
+- [x] 7.22.2 Implement client initialization and lifecycle.
+- [x] 7.22.3 Implement GET.
+- [x] 7.22.4 Implement PUT.
+- [x] 7.22.5 Implement DELETE.
+- [x] 7.22.6 Implement compare-and-swap.
+- [x] 7.22.7 Validate mutation identity safety.
+- [x] 7.22.8 Validate output and exit-code contracts.
+- [x] 7.22.9 Complete comprehensive unit validation.
+- [x] 7.22.10 Complete distributed integration validation.
+- [x] 7.22.11 Complete final repository regression.
+- [ ] 7.22.12 Complete documentation and merge.
+
+### Distributed Integration Validation
+
+- [x] Validate the distributed CLI test harness.
+- [x] Validate CRUD, CAS, and read modes.
+- [x] Validate bootstrap discovery and fallback.
+- [x] Validate leader failover and recovery.
+- [x] Validate durable request deduplication.
+- [x] Validate conflicting mutation identities.
+- [x] Validate quorum loss and uncertain mutation recovery.
+- [x] Validate complete backend outage and recovery.
+- [x] Validate concurrent reads and mutations.
+- [x] Complete distributed stress and race validation.
+
+### Validation Summary
+
+- 127 CLI unit test functions.
+- 30 distributed integration test functions.
+- 150 final normal distributed executions passed.
+- 60 final race distributed executions passed.
+- 210 final distributed executions passed.
+- 98.1% CLI unit statement coverage.
+- All 17 repository packages with tests passed.
+- Build, static analysis, and module verification passed.
+- Existing backend and protobuf contracts preserved.
+- Existing Go module dependencies preserved.
+
+See [GRPC_CLI.md](GRPC_CLI.md) for configuration, command
+contracts, validation results, and remaining limitations.
+
+The CLI is validated against a three-replica, single-shard
+deployment. Physical multi-shard deployment remains future work.
+
+
 ## Step 8 - Sharding and the Metadata Group
 
 - [x] Implement deterministic CRC32 slot calculation.
