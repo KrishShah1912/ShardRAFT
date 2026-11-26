@@ -133,3 +133,42 @@ See [GRPC_CLIENT.md](GRPC_CLIENT.md) for implementation
 details, validation results, and remaining limitations.
 
 Physical sharding and multiple Raft groups remain future work.
+
+
+## Step 8 - Sharding and the Metadata Group
+
+- [x] Implement deterministic CRC32 slot calculation.
+- [x] Define the four-shard layout and metadata group.
+- [x] Implement the versioned shard map with validation.
+- [x] Validate contiguous ranges with no gaps or overlaps.
+- [x] Validate unique shards and unique replicas.
+- [x] Implement the metadata SET_SHARD_MAP state machine.
+- [x] Enforce expected-version and current-plus-one updates.
+- [x] Leave state unchanged on rejected commands.
+- [x] Implement metadata snapshot and restore.
+- [x] Implement the key-to-group router.
+- [x] Implement the typed wrong-shard ownership check.
+- [x] Implement the ownership-enforcing group wrapper.
+- [x] Implement the local dispatcher with not-local errors.
+- [x] Complete meta and shard unit tests.
+- [x] Pass race detection and static analysis.
+- [x] Complete sharding documentation.
+
+### Validation Summary
+
+- A key always maps to the same slot.
+- Every slot has exactly one owner, with correct boundaries.
+- Keys spread across all four shards.
+- Requests route to the group that owns the key.
+- Ownership follows shard map updates.
+- The state machine is deterministic and rejects stale,
+  non-consecutive, invalid and unknown commands.
+- `go test -race -count=1 ./internal/meta ./internal/shard` passed.
+- `go vet ./...` passed.
+
+See [SHARDING.md](SHARDING.md) for architecture, the ownership
+model, request flow and limitations.
+
+The production daemon still runs a single Raft group owning all
+65,536 slots. Multiple physical Raft groups and shard rebalancing
+remain future work.
