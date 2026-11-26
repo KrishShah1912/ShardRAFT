@@ -1407,7 +1407,9 @@ The public shard API is `GetLinearizable(ctx, key)`.
 The existing local `Get` API remains available.
 
 Client-facing gRPC KV integration is implemented.
-The existing HTTP GET endpoint is unchanged.
+The existing daemon HTTP GET endpoint is unchanged.
+The standalone HTTP-gRPC gateway provides linearizable
+GET requests by default.
 
 See [ReadIndex architecture and validation](docs/READ_INDEX.md)
 for implementation details, safety guarantees, and test commands.
@@ -1454,3 +1456,128 @@ Browser E2E tests were not rerun for this milestone.
 
 Physical sharding, multiple Raft groups, dynamic ownership,
 and shard rebalancing remain future work.
+
+## HTTP-gRPC Gateway
+
+Step 7.21 introduces a standalone HTTP-gRPC gateway
+backed by the shard-aware gRPC client.
+
+### Implemented Features
+
+- HTTP GET, PUT, DELETE, and compare-and-swap.
+- Automatic metadata discovery and leader-aware routing.
+- Default quorum-confirmed linearizable reads.
+- Explicit local reads.
+- Strict JSON request validation.
+- Bounded retries and request deadlines.
+- Stable mutation identities and durable deduplication.
+- Structured HTTP error responses.
+- Committed request conflict confirmation.
+- Graceful shutdown and independent gateway restart.
+
+### Architecture
+
+```mermaid
+flowchart LR
+    C[HTTP Client] --> G[HTTP-gRPC Gateway]
+    G --> GC[Shard-Aware gRPC Client]
+    GC --> M[Metadata Service]
+    GC --> N1[Raft Node 1]
+    GC --> N2[Raft Node 2]
+    GC --> N3[Raft Node 3]
+    N1 <--> N2
+    N2 <--> N3
+    N3 <--> N1
+```
+
+The gateway is an additional client-facing service.
+The existing daemon HTTP API and React dashboard
+remain unchanged.
+
+### Build and Run
+
+Build the gateway from the repository root:
+
+```bash
+mkdir -p bin
+go build -o bin/shardraft-gateway ./cmd/shardraft-gateway
+```
+
+With a compatible gRPC-enabled ShardRAFT cluster running:
+
+```bash
+./bin/shardraft-gateway \
+  -http-addr 127.0.0.1:8085 \
+  -grpc-endpoints 127.0.0.1:9091,127.0.0.1:9092,127.0.0.1:9093 \
+  -request-timeout 11s
+```
+
+### Supported HTTP Operations
+
+| Method | Endpoint | Operation |
+|---|---|---|
+| GET | `/kv/{key}` | Linearizable read by default |
+| PUT | `/kv/{key}` | Insert or update |
+| DELETE | `/kv/{key}` | Delete |
+| POST | `/kv/{key}/cas` | Compare-and-swap |
+
+All mutations require a client_id and request_id.
+Retries must preserve the original mutation identity
+and operation contents.
+
+Explicit local reads are available through
+`?read_mode=local` and may return stale data.
+
+### Gateway Validation
+
+| Validation | Result |
+|---|---|
+| Gateway test functions | 78 |
+| Gateway unit test functions | 59 |
+| Distributed test functions | 19 |
+| Distributed baseline | 19/19 passed |
+| Distributed shuffled stress | 95/95 passed |
+| Distributed race validation | 57/57 passed |
+| Complete gateway suite | 78/78 passed |
+| Total distributed executions | 190/190 passed |
+| Gateway unit statement coverage | 95.5% |
+| gRPC client statement coverage | 92.5% |
+| Backend package regression | Passed |
+| Backend package race regression | Passed |
+| Build and static analysis | Passed |
+| Module and dependency validation | Passed |
+
+Distributed tests cover:
+
+- Bootstrap discovery through a follower.
+- CRUD, CAS, and read consistency modes.
+- Leader failover and durable request deduplication.
+- Conflicting request identities.
+- Quorum loss and recovery.
+- Concurrent mutations and replica convergence.
+- Complete backend unavailability and recovery.
+- Independent gateway restart.
+- Historical mutation replay after gateway restart.
+
+The distributed fixture uses three independent daemon
+processes, real network connections, and isolated
+temporary persistent storage.
+
+### Compatibility and Limitations
+
+The gateway preserves existing HTTP endpoints and
+gRPC service methods. The conflict_committed field
+is an additive protobuf extension.
+
+The current deployment contains one Raft group owning
+all 65,536 logical hash slots.
+
+Physical multi-shard deployment, dynamic shard migration,
+production security hardening, and exhaustive consistency
+verification remain future work.
+
+Browser E2E tests were not rerun for this milestone.
+
+See [HTTP-gRPC Gateway](docs/HTTP_GRPC_GATEWAY.md)
+for configuration, API examples, architecture,
+error handling, and reproducible validation commands.

@@ -143,8 +143,11 @@ type RoutingError struct {
 	Term          uint64                 `protobuf:"varint,5,opt,name=term,proto3" json:"term,omitempty"`
 	ShardId       uint64                 `protobuf:"varint,6,opt,name=shard_id,json=shardId,proto3" json:"shard_id,omitempty"`
 	Epoch         uint64                 `protobuf:"varint,7,opt,name=epoch,proto3" json:"epoch,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// True only when the request identity conflicts with
+	// an already committed and applied command.
+	ConflictCommitted bool `protobuf:"varint,8,opt,name=conflict_committed,json=conflictCommitted,proto3" json:"conflict_committed,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *RoutingError) Reset() {
@@ -224,6 +227,13 @@ func (x *RoutingError) GetEpoch() uint64 {
 		return x.Epoch
 	}
 	return 0
+}
+
+func (x *RoutingError) GetConflictCommitted() bool {
+	if x != nil {
+		return x.ConflictCommitted
+	}
+	return false
 }
 
 type RequestHeader struct {
@@ -666,7 +676,7 @@ var File_kv_proto protoreflect.FileDescriptor
 
 const file_kv_proto_rawDesc = "" +
 	"\n" +
-	"\bkv.proto\x12\fshardraft.v1\"\xde\x01\n" +
+	"\bkv.proto\x12\fshardraft.v1\"\x8d\x02\n" +
 	"\fRoutingError\x12+\n" +
 	"\x04code\x18\x01 \x01(\x0e2\x17.shardraft.v1.ErrorCodeR\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1b\n" +
@@ -674,7 +684,8 @@ const file_kv_proto_rawDesc = "" +
 	"\x0eleader_address\x18\x04 \x01(\tR\rleaderAddress\x12\x12\n" +
 	"\x04term\x18\x05 \x01(\x04R\x04term\x12\x19\n" +
 	"\bshard_id\x18\x06 \x01(\x04R\ashardId\x12\x14\n" +
-	"\x05epoch\x18\a \x01(\x04R\x05epoch\"|\n" +
+	"\x05epoch\x18\a \x01(\x04R\x05epoch\x12-\n" +
+	"\x12conflict_committed\x18\b \x01(\bR\x11conflictCommitted\"|\n" +
 	"\rRequestHeader\x12\x1b\n" +
 	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12\x1d\n" +
 	"\n" +

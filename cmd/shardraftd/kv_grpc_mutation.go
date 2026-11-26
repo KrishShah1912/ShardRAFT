@@ -74,6 +74,22 @@ func (s *kvGRPCServer) mutationError(
 	}
 }
 
+// checkedMutationError handles errors returned by the applied
+// request-result lookup, not by the pending proposal path.
+func (s *kvGRPCServer) checkedMutationError(
+	err error,
+	found bool,
+	submitted bool,
+) *shardraftpb.MutationResponse {
+	response := s.mutationError(err, submitted)
+
+	if found && errors.Is(err, kvstore.ErrRequestConflict) {
+		response.Error.ConflictCommitted = true
+	}
+
+	return response
+}
+
 func (s *kvGRPCServer) completedMutation(
 	result kvstore.RequestResult,
 ) *shardraftpb.MutationResponse {
@@ -142,7 +158,7 @@ func (s *kvGRPCServer) executeMutation(
 	}
 
 	if err != nil {
-		return s.mutationError(err, false), nil
+		return s.checkedMutationError(err, found, false), nil
 	}
 
 	if found {
@@ -192,7 +208,7 @@ func (s *kvGRPCServer) executeMutation(
 		}
 
 		if err != nil {
-			return s.mutationError(err, true), nil
+			return s.checkedMutationError(err, found, true), nil
 		}
 
 		if found {
