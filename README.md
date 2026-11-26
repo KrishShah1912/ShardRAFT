@@ -1,1714 +1,1537 @@
-
 # ShardRAFT
 
-### Building a Fault-Tolerant Distributed Key-Value Database
+### A Fault-Tolerant Distributed Key-Value Database Built with Raft
 
-**Project Status:** Active Development — Raft Consensus, Durable Storage, Recovery, and Fault Testing Implemented
+[![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8?logo=go&logoColor=white)](go.mod)
+[![CI](https://github.com/KrishShah1912/ShardRAFT/actions/workflows/ci.yml/badge.svg)](https://github.com/KrishShah1912/ShardRAFT/actions/workflows/ci.yml)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](web/package.json)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![gRPC](https://img.shields.io/badge/gRPC-Protocol%20Buffers-244C5A)](proto/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**Team Members:** Krish Shah, Hetansh Patel, Sri Veda 
+**Custom Raft Consensus | Durable Storage | Multi-Raft Sharding |
+Linearizable Reads | Automatic Failover | Distributed Evaluation**
 
----
+ShardRAFT is a distributed key-value database implemented in Go,
+designed to demonstrate how distributed storage systems achieve
+consistency, fault tolerance, durability, and horizontal data
+partitioning through consensus-based replication.
 
-## 1. Overview
+The project implements its own Raft consensus engine rather than
+delegating consensus to an external Raft library. It combines persistent
+storage, replicated metadata, shard-aware routing, gRPC services,
+HTTP gateways, a command-line client, and an interactive React dashboard.
 
-ShardRAFT is a distributed database project designed to explore how multiple machines can coordinate, replicate data, recover from failures, and maintain strong consistency. The project is currently in active development, focusing on a custom implementation of the Raft consensus algorithm built in Go.
+**Project status:** Planned feature implementation complete.
+Final local build, static analysis, and race validation passed.
 
-The long-term goal is to build a complete distributed key-value database featuring:
-
-- Leader-based consensus and replication
-- Automatic leader election and failover
-- Replicated key-value storage
-- Durable write-ahead logging
-- Crash recovery and snapshots
-- Hash-based data sharding
-- Distributed request routing
-- Client-facing backend APIs
-- A web-based database management dashboard
-- Fault injection and consistency verification
-
-Unlike a database that simply connects to an existing storage service, ShardRAFT aims to implement and demonstrate the core mechanisms of a distributed database.
-
-### Current implementation status
-
-ShardRAFT currently implements a Go-based Raft consensus engine, an in-memory
-cluster simulator, write-ahead logging (WAL), a key-value state machine,
-snapshots, log compaction, and crash recovery.
-
-The implementation includes leader election, majority-based log commitment,
-follower catch-up, replication request correlation, and safety invariants.
-
-Testing covers simulated network partitions, selective message loss,
-delayed and reordered replication responses, restart recovery,
-and deterministic randomized fault workloads.
-
-**Important:** ShardRAFT implements real networking, HTTP and gRPC APIs,
-a React dashboard, metadata discovery, and shard-aware client routing.
-Physical sharding is implemented through the optional multi-Raft deployment mode. The current tests do not constitute
-a proof of correctness under all possible failures.
+**Academic project:** CSE 512 — Distributed Database Systems,
+Arizona State University.
 
 ---
 
-## 2. Problem Statement
+## Table of Contents
 
-Traditional single-node databases depend on one machine for storing and serving data.
-
-If that machine fails, the database may become unavailable. If its data has not been safely persisted or replicated, information may also be lost.
-
-Distributed databases address these problems by maintaining copies of data across multiple machines.
-
-However, replication introduces difficult challenges:
-
-1. How do multiple nodes agree on the current leader?
-2. How can replicas maintain a consistent ordering of operations?
-3. What happens when a follower misses log entries?
-4. How should a cluster react when a leader becomes unavailable?
-5. How can the system prevent outdated leaders from making conflicting decisions?
-6. How can acknowledged writes survive crashes?
-7. How can data be partitioned and distributed across multiple Raft groups?
-
-ShardRAFT addresses these challenges through consensus-based replication, with Raft serving as the foundation for the future database.
-
----
-
-## 3. Project Objectives
-
-The primary objectives of ShardRAFT are:
-
-### Consensus
-
-Implement Raft leader election, log replication, and commit tracking without relying on an external Raft library.
-
-### Fault Tolerance
-
-Allow a replicated group to elect a new leader when the previous leader becomes unavailable, provided a majority of nodes can communicate.
-
-### Consistency
-
-Maintain a consistent sequence of committed operations across replicas.
-
-### Durability
-
-Eventually persist Raft state, logs, and database records so that nodes can recover after restarting.
-
-### Partitioning
-
-Divide the key space into shards and manage each shard through its own Raft replication group.
-
-### Observability
-
-Provide tools for inspecting cluster state, database contents, replication progress, and failure recovery.
-
-### Evaluation
-
-Measure throughput, latency, recovery time, and correctness under controlled workloads and failure scenarios.
+- [Project Highlights](#project-highlights)
+- [Key Features](#key-features)
+- [System Architecture](#system-architecture)
+- [Technology Stack](#technology-stack)
+- [Repository Structure](#repository-structure)
+- [Raft Consensus](#raft-consensus)
+- [Persistent Storage and Recovery](#persistent-storage-and-recovery)
+- [Multi-Raft Sharding](#multi-raft-sharding)
+- [Metadata and Request Routing](#metadata-and-request-routing)
+- [Consistency and Request Deduplication](#consistency-and-request-deduplication)
+- [Getting Started](#getting-started)
+- [Docker Deployment](#docker-deployment)
+- [HTTP API](#http-api)
+- [gRPC Services and CLI](#grpc-services-and-cli)
+- [Web Dashboard](#web-dashboard)
+- [Fault Tolerance](#fault-tolerance)
+- [Correctness Verification](#correctness-verification)
+- [Performance Evaluation](#performance-evaluation)
+- [Testing and Continuous Integration](#testing-and-continuous-integration)
+- [Implementation Milestones](#implementation-milestones)
+- [Documentation](#documentation)
+- [Limitations](#limitations)
+- [Team](#team)
+- [References](#references)
+- [License](#license)
 
 ---
 
-## 4. Technology Stack
+## Project Highlights
 
-### Currently used
+| Metric | Result |
+|---|---:|
+| Storage nodes | 5 |
+| HTTP gateways | 2 |
+| Independent data Raft groups | 4 |
+| Replicated metadata groups | 1 |
+| Logical hash slots | 65,536 |
+| Replication factor per group | 3 |
+| Successful distributed benchmark operations | 8,000 |
+| Linearizable recorded benchmark histories | 8/8 |
+| Peak measured workload throughput | 1,483.75 ops/sec |
+| Measured end-to-end leader failover | 1.337 seconds |
+| Measured replica recovery | 0.949 seconds |
+| WAL microbenchmark records | 30,000 |
+| Final local race-tested packages passed | 22/22 |
 
-| Technology | Purpose |
-|---|---|
-| Go | Raft implementation and cluster simulation |
-| Go testing framework | Unit and integration tests |
-| Go race detector | Detecting data races during tests |
-| Git | Version control |
-| GitHub | Source code hosting |
-| In-memory state | Raft state and cluster simulation |
-| Write-ahead logging (WAL) | Durable Raft state and log storage |
-| Key-value state machine | Applying committed database operations |
-| Snapshots and log compaction | State recovery and bounded log history |
-| Deterministic fault injection | Simulating message loss, delays, and reordering |
-
-### Planned technologies
-
-| Technology | Intended purpose |
-|---|---|
-| React | Web-based database dashboard |
-| TypeScript | Frontend development |
-| Go HTTP API | Client-facing backend operations |
-| gRPC / Protocol Buffers | Communication between distributed nodes |
-| BadgerDB or BoltDB | Embedded key-value storage |
-| Docker | Containerized deployment |
-| Docker Compose | Multi-node local deployment |
-| Prometheus / Grafana | Metrics and monitoring |
-| YCSB-style workloads | Performance evaluation |
-| Porcupine | Linearizability checking |
-
-These planned technologies are architectural options. Their final selection and integration will be determined during later development.
+Performance figures represent measured local experiments,
+not guaranteed production performance.
 
 ---
 
-## 5. Current System Architecture
-
-The current implementation focuses on Raft consensus and simulated communication between nodes.
-
-```mermaid
-flowchart TD
-    A[Go Tests] --> B[Simulated Cluster]
-
-    B --> N1[Raft Node 1]
-    B --> N2[Raft Node 2]
-    B --> N3[Raft Node 3]
-
-    N1 <--> N2
-    N1 <--> N3
-    N2 <--> N3
-
-    N1 --> L1[In-Memory Raft Log]
-    N2 --> L2[In-Memory Raft Log]
-    N3 --> L3[In-Memory Raft Log]
-```
-
-The simulated cluster controls logical time and message delivery.
-
-Each Raft node maintains its own state, including:
-
-- Current term
-- Current role
-- Vote information
-- Replicated log
-- Commit index
-- Outgoing messages
-- Follower replication progress
-
-The simulator allows multiple nodes to interact without requiring separate operating-system processes or network connections.
-
-This is useful for developing and testing consensus behavior before introducing real networking.
-
----
-
-## 6. Raft Consensus Algorithm
-
-Raft is a consensus algorithm that allows a group of nodes to agree on an ordered sequence of operations.
-
-It organizes consensus around a leader.
-
-The leader coordinates replication, while followers receive and validate log entries.
-
-ShardRAFT currently implements the fundamental Raft roles and replication mechanisms.
-
-### 6.1 Raft Node Roles
-
-Every Raft node operates in one of three roles.
-
-#### Follower
-
-A follower:
-
-- Receives messages from the leader.
-- Responds to voting requests.
-- Accepts valid log entries.
-- Maintains its local replicated log.
-- Can start an election when its election timeout expires.
-
-#### Candidate
-
-A candidate:
-
-- Starts a new election.
-- Increases the election term.
-- Requests votes from other nodes.
-- Becomes leader after receiving a majority.
-
-#### Leader
-
-A leader:
-
-- Coordinates replication.
-- Accepts proposed commands.
-- Sends AppendEntries messages.
-- Tracks follower replication progress.
-- Determines which entries can be committed.
-- Sends heartbeats to followers.
-
-### 6.2 Leader Election
-
-When a follower does not receive leader communication within its election timeout, it may become a candidate.
-
-The candidate requests votes from other nodes.
-
-In a three-node cluster, two votes form a majority.
-
-```mermaid
-sequenceDiagram
-    participant N1 as Node 1
-    participant N2 as Node 2
-    participant N3 as Node 3
-
-    Note over N1: Election timeout
-    N1->>N2: RequestVote
-    N1->>N3: RequestVote
-
-    N2-->>N1: Vote Granted
-
-    Note over N1: Majority reached
-    Note over N1: Becomes Leader
-
-    N1->>N2: Heartbeat
-    N1->>N3: Heartbeat
-```
-
-ShardRAFT includes leader-election tests using a three-node cluster.
-
-### 6.3 Terms
-
-Raft uses terms to identify election periods.
-
-Each term represents a logical epoch.
-
-Terms help nodes distinguish newer leaders from outdated ones.
-
-Messages from older terms can be rejected, preventing stale leaders from controlling the cluster.
-
-### 6.4 Heartbeats
-
-The leader periodically sends heartbeat messages to followers.
-
-Heartbeats communicate that the leader is active.
-
-They also help followers learn updated commit information.
-
-If followers stop receiving valid leader communication, they may eventually start a new election.
-
----
-
-## 7. Raft Log Replication
-
-Log replication ensures that followers receive the operations proposed through the leader.
-
-Each log entry contains information such as:
-
-| Field | Description |
-|---|---|
-| Index | Position of the entry |
-| Term | Term associated with the entry |
-| Type | Normal command or no-op |
-| Data | Command payload |
-
-### 7.1 Command Proposal
-
-The current Raft implementation supports proposing command bytes through the leader.
-
-For example:
-
-```go
-err := leader.Propose([]byte("SET x=10"))
-```
-
-This creates a log entry containing the proposed command.
-
-At this stage, the command is replicated as data in the Raft log. It is not yet applied through a complete persistent key-value database engine.
-
-### 7.2 AppendEntries
-
-The leader sends AppendEntries messages to followers.
-
-These messages include:
-
-- Current term
-- Leader identity
-- Previous log index
-- Previous log term
-- Entries to replicate
-- Leader commit index
-- Request identifier
-
-The follower checks whether the previous log position matches its local log.
-
-If the log prefix is valid, the follower can accept the entries.
-
-Otherwise, it rejects the request.
-
-### 7.3 Replication Example
-
-```mermaid
-sequenceDiagram
-    participant C as Proposal
-    participant L as Leader
-    participant F1 as Follower 1
-    participant F2 as Follower 2
-
-    C->>L: Propose command
-    Note over L: Append entry to log
-
-    L->>F1: AppendEntries
-    L->>F2: AppendEntries
-
-    F1-->>L: AppendEntries Response
-    F2-->>L: AppendEntries Response
-
-    Note over L: Majority replicated
-    Note over L: Advance commit index
-```
-
-This diagram represents the consensus replication flow.
-
-The database mutation API waits for the committed operation to be applied before returning a successful result.
-
----
-
-## 8. Majority-Based Commit
-
-Raft uses majority agreement to determine whether log entries can be committed.
-
-For a three-node Raft group:
-
-- One node is not a majority.
-- Two nodes form a majority.
-- Three nodes represent the complete group.
-
-The leader tracks follower replication progress and uses Raft's commit rules to advance the commit index.
-
-ShardRAFT includes tests for:
-
-- Majority-based commit.
-- Preventing premature commit.
-- Committing current-term entries.
-- Handling entries inherited from previous terms.
-
-### Current-Term Commit Rule
-
-A Raft leader cannot directly commit an entry from an older term merely by counting replicas.
-
-Instead, it commits a qualifying current-term entry.
-
-This can also establish commitment of preceding entries.
-
-ShardRAFT implements leader no-op entries and tests this behavior.
-
----
-
-## 9. Leader No-Op Entries
-
-When a node becomes leader, the current implementation appends a no-op entry in its term.
-
-A no-op entry participates in the Raft log but does not represent a user database modification.
-
-For example:
-
-| Index | Term | Type |
-|---|---|---|
-| 1 | 1 | Normal |
-| 2 | 2 | No-op |
-
-The current-term no-op helps establish a commit point under Raft's commitment rules.
-
-This is especially important when a newly elected leader inherits entries from an earlier term.
-
-ShardRAFT contains tests for this behavior.
-
----
-
-## 10. Follower Catch-Up and Log Conflict Handling
-
-Followers may fall behind because of delayed messages, missed replication requests, or temporary unavailability.
-
-Raft uses log consistency checks and retries to bring followers up to date.
-
-### Example
-
-Suppose the leader contains:
-
-```text
-Leader:
-Index:  1  2  3  4
-Entry:  A  B  C  No-op
-```
-
-But the follower contains:
-
-```text
-Follower:
-Index:  1
-Entry:  A
-```
-
-The leader may initially assume the follower has more entries than it actually does.
-
-The follower rejects the AppendEntries request when the previous log entry is missing.
-
-The leader then adjusts its replication position and retries.
-
-Eventually, the leader finds a matching prefix and sends the missing entries.
-
-### Tested Behavior
-
-ShardRAFT includes `TestLaggingFollowerCatchesUp`.
-
-During development, the test demonstrated the following sequence:
-
-```text
-RequestID=1  reject=true   index=3
-RequestID=3  reject=true   index=2
-RequestID=4  reject=false  index=4
-```
-
-This shows the leader retrying with earlier log positions until the follower can accept the missing entries.
-
-The test ultimately passed, verifying follower catch-up in this simulated scenario.
-
-### Additional Safety Checks
-
-The implementation also tests:
-
-- Rejection of malformed log entries.
-- Previous-index and previous-term validation.
-- Preservation of valid log suffixes.
-- Protection against overwriting committed entries.
-- Prevention of commit-index regression.
-
----
-
-## 11. AppendEntries RequestID Correlation
-
-One of the recent improvements to ShardRAFT is request-response correlation for AppendEntries.
-
-### The Problem
-
-Distributed messages can be delayed, duplicated, or delivered out of order.
-
-Without request correlation, a leader may incorrectly associate a response with the wrong replication request.
-
-This can corrupt its understanding of follower progress.
-
-### The Solution
-
-ShardRAFT assigns unique request identifiers to outgoing AppendEntries requests.
-
-For example:
-
-```text
-Leader -> Follower
-
-AppendEntries
-RequestID = 17
-```
-
-The follower includes the same identifier in its response:
-
-```text
-Follower -> Leader
-
-AppendEntriesResponse
-RequestID = 17
-```
-
-The leader checks whether the response corresponds to an outstanding request.
-
-Unknown or already-consumed request IDs are ignored.
-
-### Current Implementation
-
-The Raft implementation tracks:
-
-```go
-nextRequestID uint64
-```
-
-and pending AppendEntries requests associated with followers.
-
-Responses are checked against recorded request information before updating replication progress.
-
-### Important Limitation
-
-RequestID correlation is not equivalent to message authentication.
-
-It also does not automatically solve every message-reordering scenario.
-
-Further work is planned to improve pending-request tracking across leadership transitions and more complex reordered responses.
-
----
-
-## 12. Replication Progress Tracking
-
-The leader maintains replication progress for followers.
-
-Two important structures are:
-
-### nextIndex
-
-The next log index the leader plans to send to a follower.
-
-```go
-nextIndex map[NodeID]uint64
-```
-
-### matchIndex
-
-The highest log index the leader believes a follower has successfully replicated.
-
-```go
-matchIndex map[NodeID]uint64
-```
-
-These structures help the leader:
-
-- Determine where replication should resume.
-- Retry rejected AppendEntries requests.
-- Track successful acknowledgments.
-- Determine whether entries have reached a majority.
-
-The implementation includes tests covering acknowledgment handling and progress tracking.
-
----
-
-## 13. Cluster Simulation
-
-ShardRAFT includes an in-memory simulation layer for running multiple Raft nodes.
-
-The simulator allows tests to:
-
-- Create a cluster.
-- Advance logical time.
-- Trigger elections.
-- Deliver Raft messages.
-- Submit proposals.
-- Observe replication and commitment.
-
-### Example
-
-```go
-cluster := NewCluster([]raft.NodeID{1, 2, 3})
-```
-
-The simulator is useful because consensus behavior can be tested without requiring real network infrastructure.
-
-### Three-Node Election Test
-
-The project includes a test that creates three nodes and checks whether the cluster elects exactly one leader.
-
-### Three-Node Replication Test
-
-The project also includes `TestThreeNodeReplication`.
-
-The test:
-
-1. Creates a three-node cluster.
-2. Advances the simulation.
-3. Identifies the elected leader.
-4. Proposes a command.
-5. Delivers AppendEntries requests and responses.
-6. Verifies majority-based commitment.
-
-These tests provide early integration evidence for the consensus implementation.
-
----
-
-## 14. Project Structure
-
-The currently discussed repository layout is:
-
-```text
-ShardRAFT/
-|
-|-- cmd/
-|   |-- shardraft/
-|       |-- Go command entry point
-|
-|-- internal/
-|   |
-|   |-- raft/
-|   |   |-- raft.go
-|   |   |-- replication.go
-|   |   |-- types.go
-|   |   |-- replication_test.go
-|   |   |-- Additional Raft implementation and tests
-|   |
-|   |-- meta/
-|   |   |-- slot.go
-|   |   |-- shardmap.go
-|   |   |-- statemachine.go
-|   |   |-- Slot, shard map and metadata tests
-|   |
-|   |-- shard/
-|   |   |-- router.go
-|   |   |-- group.go
-|   |   |-- dispatcher.go
-|   |   |-- Existing shard implementation and tests
-|   |
-|   |-- simnet/
-|       |-- Cluster simulation implementation
-|       |-- cluster_test.go
-|
-|-- go.mod
-|
-|-- README.md
-```
-
-### internal/raft
-
-Contains the Raft consensus implementation.
-
-Responsibilities include:
-
-- Node state
-- Elections
-- Voting
-- Heartbeats
-- Log replication
-- Commit tracking
-- Request-response handling
-
-### internal/meta
-
-Contains the sharding and metadata primitives.
-
-Responsibilities include:
-
-- Deterministic key-to-slot hashing
-- The versioned shard map and its validation
-- The metadata state machine for shard map updates
-- Shard map snapshot and restore
-
-### internal/shard
-
-Contains the existing shard implementation and the routing additions.
-
-Responsibilities include:
-
-- Mapping keys to their slot, owning group, and replicas
-- Typed wrong-shard ownership checks
-- An ownership-enforcing group wrapper around a shard
-- A dispatcher that routes requests to the local owning group
-
-### internal/simnet
-
-Contains the simulated cluster environment.
-
-Responsibilities include:
-
-- Managing simulated nodes
-- Advancing logical time
-- Delivering messages
-- Supporting integration tests
-
-### cmd/shardraft
-
-Contains the command package for the project.
-
-The current CLI interface is not yet documented as a supported database server interface.
-
----
-
-## 15. Getting Started
-
-### Prerequisites
-
-Install:
-
-- Go
-- Git
-- A terminal
-- VS Code or another code editor
-
-### Clone the Repository
-
-```bash
-git clone https://github.com/KrishShah1912/shardraft.git
-```
-
-Enter the project directory:
-
-```bash
-cd shardraft
-```
-
-### Verify Go Installation
-
-```bash
-go version
-```
-
-### Download Module Dependencies
-
-```bash
-go mod download
-```
-
-### Build the Project
-
-```bash
-go build ./...
-```
-
-The build should complete without errors.
-
-**Note:** ShardRAFT now supports a local three-node database cluster and an interactive React dashboard. Run `cd web && npm ci` to install frontend dependencies, then run `make dev` from the repository root. Open http://localhost:5173 to access the dashboard.
-
----
-
-## 16. Testing
-
-Testing is a major part of ShardRAFT's development process.
-
-### Run All Tests
-
-```bash
-go test -count=1 ./...
-```
-
-This runs the project's Go test packages.
-
-### Run Raft Tests
-
-```bash
-go test -count=1 ./internal/raft
-```
-
-### Run Simulation Tests
-
-```bash
-go test -count=1 ./internal/simnet
-```
-
-### Run Tests with Verbose Output
-
-```bash
-go test -v ./...
-```
-
-### Run a Specific Test
-
-For follower catch-up:
-
-```bash
-go test -count=1 -run '^TestLaggingFollowerCatchesUp$' -v ./internal/raft
-```
-
-### Run the Race Detector
-
-```bash
-go test -race ./...
-```
-
-The race detector helps identify certain concurrent memory-access errors.
-
-### Run Static Analysis
-
-```bash
-go vet ./...
-```
-
-### Format Go Code
-
-```bash
-go fmt ./...
-```
-
-### Build All Packages
-
-```bash
-go build ./...
-```
-
-### Latest Verified Results
-
-At the latest reported verification, the following commands passed:
-
-| Command | Result |
-|---|---|
-| `go test -count=1 ./...` | Passed |
-| `go test -race -count=1 ./...` | Passed |
-| `go vet ./...` | Passed |
-| `go build ./...` | Passed |
-| `go test -tags=stress -count=1 -run '^TestExtendedRaftStress$' ./internal/raftdriver` | Passed |
-| `go test -tags=stress -race -count=1 -run '^TestExtendedRaftStress$' ./internal/raftdriver` | Passed |
-
-These results demonstrate that the tested implementation works for the covered scenarios.
-
-They do not establish correctness under every possible distributed-system failure.
-
----
-
-## 17. Current Test Coverage
-
-The Raft tests developed so far cover scenarios including:
-
-| Test | Purpose |
-|---|---|
-| `TestLeaderProposesCommand` | Leader proposal handling |
-| `TestLeaderSendsAppendEntries` | Outgoing replication requests |
-| `TestFollowerAcceptsAppendEntries` | Follower log acceptance |
-| `TestDuplicateAppendPreservesSuffix` | Duplicate append behavior |
-| `TestLeaderTracksFollowerAcknowledgment` | Replication progress tracking |
-| `TestLeaderCommitsAfterMajority` | Majority-based commitment |
-| `TestLeaderDoesNotDirectlyCommitOldTermEntry` | Raft commit safety |
-| `TestLeaderRetriesRejectedAppend` | Rejection and retry behavior |
-| `TestLaggingFollowerCatchesUp` | Missing-entry replication |
-| `TestMalformedAppendDoesNotModifyLog` | Invalid log protection |
-| `TestFollowerRejectsCommittedEntryOverwrite` | Committed-entry safety |
-| `TestDelayedRejectionDoesNotMoveProgressBackward` | Delayed-response handling |
-| `TestLeaderCommitsInheritedEntryThroughNoop` | Current-term no-op commitment |
-| `TestFollowerCommitIndexNeverDecreases` | Commit-index monotonicity |
-| `TestFollowerLearnsCommitThroughHeartbeat` | Heartbeat commit propagation |
-| `TestHeartbeatDoesNotCommitConflictingLog` | Conflicting-log protection |
-| `TestUnsentAppendResponseDoesNotAdvanceMatchIndex` | Unknown-response rejection |
-| `TestThreeNodeElection` | Cluster leader election |
-| `TestThreeNodeReplication` | Cluster replication and commit |
-
-Additional verified test coverage includes:
-
-- End-to-end replication with dropped acknowledgments
-- Delayed and reverse-order replication responses
-- Majority commitment despite an unavailable acknowledgment
-- Eventual follower recovery after network restoration
-- Committed-log consistency and Raft invariant checking
-- WAL persistence and crash recovery
-- KV snapshot restoration and log compaction
-- Deterministic randomized fault testing
-
-Sharding and metadata test coverage includes:
-
-- A key always maps to the same slot, within range
-- Every slot has exactly one owner, with correct boundaries
-- Keys spread across all four shards
-- Shard map validation of gaps, overlaps, invalid ranges and replicas
-- A deterministic metadata state machine
-- Rejection of stale, non-consecutive, invalid and unknown commands
-- Metadata snapshot and restore
-- Key routing to the owning group and typed wrong-shard errors
-- Ownership that follows shard map updates
-- Dispatch to the local owning group and not-local errors
-
-The extended stress test exercises 100 seeds with 100 operations per seed.
-These tests cover selected failure scenarios rather than every possible
-distributed-system execution.
-
-Additional tests will be introduced as the system expands.
-
----
-
-## 18. Planned Complete Database Architecture
-
-The long-term ShardRAFT architecture extends beyond the current Raft simulator.
-
-```mermaid
-flowchart TD
-    UI[React Database Dashboard] --> API[Go Backend API]
-    CLIENT[External Clients] --> API
-
-    API --> ROUTER[Shard Router]
-
-    ROUTER --> META[Replicated Metadata Group]
-
-    ROUTER --> S1[Shard 1 - Raft Group]
-    ROUTER --> S2[Shard 2 - Raft Group]
-    ROUTER --> S3[Shard 3 - Raft Group]
-
-    S1 --> DB1[Replicated KV Storage]
-    S2 --> DB2[Replicated KV Storage]
-    S3 --> DB3[Replicated KV Storage]
-
-    DB1 --> WAL1[WAL and Snapshots]
-    DB2 --> WAL2[WAL and Snapshots]
-    DB3 --> WAL3[WAL and Snapshots]
-```
-
-This is the planned architecture, not the currently deployed system.
-
-### Main Components
-
-#### Frontend
-
-A browser-based dashboard for database operations and cluster monitoring.
-
-#### Backend API
-
-A Go service that accepts client requests and routes them to the appropriate database shard.
-
-#### Shard Router
-
-Determines which shard owns a particular key.
-
-#### Metadata Group
-
-Maintains shard placement and cluster routing information.
-
-#### Raft Groups
-
-Coordinate replicated operations within individual shards.
-
-#### Storage Engine
-
-Applies committed operations to durable key-value data.
-
-#### Recovery Layer
-
-Restores node state using persisted logs and snapshots.
-
----
-
-## 19. Database Operations
-
-The current database supports common key-value operations.
-
-### PUT / SET
-
-Store or update a value.
-
-```text
-SET user:101 {"name":"Alex"}
-```
-
-### GET
-
-Retrieve a value.
-
-```text
-GET user:101
-```
-
-### DELETE
-
-Remove a key.
-
-```text
-DELETE user:101
-```
-
-### Compare-and-Swap
-
-Conditionally update a key if its current value or version matches an expected value.
-
-These operations are exposed through the current HTTP backend API.
-
-### Planned Write Flow
-
-1. Client submits a write.
-2. Backend identifies the correct shard.
-3. Request reaches the shard leader.
-4. Leader appends the operation to its Raft log.
-5. Replicas persist the operation.
-6. The Raft group reaches a majority.
-7. The operation becomes committed.
-8. The committed operation is applied to the key-value state machine.
-9. The client receives a successful response.
-
-This flow describes the intended durable database behavior.
-
-### Planned Read Flow
-
-1. Client requests a key.
-2. Backend determines the owning shard.
-3. Request reaches the appropriate replica.
-4. The system performs the consistency checks required by the selected read mode.
-5. The stored value is returned.
-
-Quorum-confirmed linearizable reads are implemented through the internal shard ReadIndex API. The existing HTTP GET endpoint does not yet use this mechanism.
-
----
-
-## 20. Planned Data Sharding
-
-The architecture divides the key space into **65,536 logical hash slots**.
-
-Each key maps deterministically to a slot.
-
-Each shard owns a contiguous range of slots.
-
-The four-shard layout and its replica placement are:
-
-| Shard | Slot range | Replicas |
-|---|---|---|
-| Shard 1 | 0–16383 | n1, n2, n3 |
-| Shard 2 | 16384–32767 | n2, n3, n4 |
-| Shard 3 | 32768–49151 | n3, n4, n5 |
-| Shard 4 | 49152–65535 | n4, n5, n1 |
-
-A separate metadata group (replicas n1, n2, n3) holds the shard map.
-
-### Implemented Sharding Components
-
-The in-process sharding and metadata primitives are implemented and
-tested in `internal/meta` and `internal/shard`:
-
-- **Slot mapping** — `SlotForKey` hashes a key with CRC32 IEEE modulo
-  65,536, deterministically and stably.
-- **Shard map** — a versioned `ShardMap` with validation that enforces
-  contiguous ranges with no gaps or overlaps, every slot owned once,
-  and valid unique replicas.
-- **Metadata state machine** — applies `SET_SHARD_MAP` commands with an
-  expected version, requires the new version to be the current version
-  plus one, leaves state unchanged on rejection, and supports snapshot
-  and restore.
-- **Router** — maps a key to its slot, owning group, and replicas.
-- **Ownership checks** — a typed wrong-shard error that names the real
-  owning group and its replicas.
-- **Group** — a wrapper around an existing shard that rejects keys it
-  does not own, checking the current map on every call.
-- **Dispatcher** — routes each request to the local group owning the
-  key, and returns a not-local error with the replica list otherwise.
-
-Live multi-group Raft deployment and wiring these components into the
-HTTP and gRPC servers remain planned. See
-[Sharding and the Metadata Group](docs/SHARDING.md) for details.
-
-### Why Hash-Based Sharding?
-
-Hash-based partitioning provides:
-
-- Deterministic key placement
-- Distribution across shards
-- Straightforward request routing
-- A foundation for horizontal scaling
-
-A limitation is that hashing does not preserve natural key ordering, making ordered range queries less efficient.
-
-### Replication Per Shard
-
-Each shard is intended to have its own Raft group. The current work
-defines the shard map and routing; running a live Raft group per shard
-remains planned.
-
-A three-replica group can tolerate one unavailable replica while retaining a majority, assuming the remaining replicas can communicate and have the required durable state.
-
----
-
-## 21. Planned Fault Tolerance and Recovery
-
-The final database is intended to handle several failure scenarios.
-
-### Leader Failure
-
-If a leader becomes unavailable, the remaining nodes can start an election.
-
-A new leader can be elected if a majority remains available.
-
-### Follower Failure
-
-A follower may temporarily stop receiving log entries.
-
-When it returns, the leader should synchronize the missing entries.
-
-### Process Restart
-
-A restarted node should restore its persisted state and resume participating in replication.
-
-### Network Partition
-
-A partition that does not contain a majority should not continue committing writes.
-
-### Crash Recovery
-
-The planned storage system will use:
-
-- Persistent Raft state
-- Write-ahead logging
-- Log replay
-- Snapshots
-- Replica synchronization
-
-These features require additional implementation and testing.
-
----
-
-## 22. Frontend Dashboard
-
-ShardRAFT includes a React and TypeScript dashboard for database operations, cluster monitoring, and controlled failure experiments.
-
-### Database Explorer
-
-Users will be able to:
-
-- View stored keys
-- Inspect values
-- Insert records
-- Update records
-- Delete records
-- Search for keys
-
-### Query Console
-
-Users will be able to execute database operations and inspect the responses.
-
-### Cluster Dashboard
-
-The interface will display:
-
-- Active nodes
-- Current leaders
-- Followers
-- Raft terms
-- Commit indexes
-- Replication progress
-- Node availability
-
-### Replication Visualization
-
-The dashboard will help demonstrate how writes propagate through the cluster.
-
-### Failure Simulation
-
-Controlled experiments will allow users to observe:
-
-- Leader failure
-- New leader election
-- Follower disconnection
-- Replica catch-up
-- Recovery after restart
-
-### Shard Explorer
-
-Users will be able to inspect which shard owns a particular key.
-
-The frontend will interact with the real backend and database implementation rather than relying on permanently mocked data.
-
----
-
-## 23. Planned Evaluation
-
-ShardRAFT will be evaluated using several categories.
-
-### Throughput
-
-Measure the number of completed operations per second.
-
-### Latency
-
-Measure request latency, including:
-
-- p50 latency
-- p95 latency
-- p99 latency
-
-### Fault Recovery
-
-Measure how long the cluster takes to recover from leader or follower failures.
-
-### Replication Correctness
-
-Check that committed operations are preserved and consistently applied.
-
-### Linearizability
-
-Record operation histories and use a checker to detect violations of the intended consistency guarantees.
-
-### Scalability
-
-Compare performance with different numbers of shards and nodes.
-
-### Durability
-
-Test whether acknowledged writes survive supported crash scenarios.
-
-### Workloads
-
-Planned workloads include:
-
-- Read-heavy
-- Write-heavy
-- Balanced read/write
-- Uniform key distribution
-- Skewed or hot-key distribution
-
-Preliminary local benchmark results are documented in [Integration Validation](docs/INTEGRATION_VALIDATION.md).
-
----
-
-## 24. Development Roadmap
-
-### Phase 1 — Raft Foundation
-
-- [x] Initialize the Go project
-- [x] Implement Raft node roles
-- [x] Implement leader election
-- [x] Implement voting
-- [x] Implement heartbeats
-- [x] Implement command proposals
-- [x] Implement AppendEntries
-- [x] Implement majority-based commit
-- [x] Implement leader no-op entries
-- [x] Implement follower replication tracking
-- [x] Implement log rejection and retries
-- [x] Implement follower catch-up
-- [x] Add AppendEntries RequestID correlation
-- [x] Add three-node cluster simulation tests
-
-### Phase 2 — Raft Hardening
-
-- [x] Improve handling of reordered replication responses
-- [x] Clean up outstanding requests during leadership changes
-- [x] Expand election safety tests
-- [x] Add more failure and partition scenarios
-- [x] Strengthen consensus correctness verification through invariants and randomized testing
-
-### Phase 3 — Persistent Storage
-
-- [x] Implement write-ahead logging
-- [x] Persist Raft state
-- [x] Build the key-value state machine
-- [x] Add snapshots
-- [x] Implement crash recovery
-- [x] Test data recovery after restart
-
-### Phase 4 — Backend and Networking
-
-- [x] Implement real node-to-node communication
-- [x] Run nodes as independent processes
-- [x] Build client-facing APIs
-- [x] Add request routing
-- [x] Handle leader redirection and retries
-
-### Phase 5 — Sharding
-
-- [x] Implement hash-slot partitioning
-- [x] Implement the metadata state machine
-- [x] Add shard routing logic
-- [ ] Introduce multiple live Raft groups
-- [ ] Wire routing into the HTTP and gRPC servers
-- [ ] Test live data distribution
-- [ ] Explore shard rebalancing
-
-### Phase 6 — Frontend
-
-- [x] Build React and TypeScript application
-- [x] Create database explorer
-- [x] Create query console
-- [x] Create cluster monitoring dashboard
-- [x] Add replication visualization
-- [x] Add failure simulation controls
-
-### Phase 7 — Evaluation and Deployment
-
-- [x] Add deterministic fault-injection experiments
-- [ ] Add linearizability checking
-- [x] Benchmark throughput and latency
-- [x] Measure recovery time
-- [ ] Containerize the system
-- [ ] Build a multi-node Docker Compose deployment
-- [ ] Prepare end-to-end demonstrations
-
----
-
-## 25. Current Limitations
-
-ShardRAFT is under active development.
-
-The following limitations currently apply:
-
-1. The simulator complements the local HTTP-based cluster but does not reproduce every real network condition.
-2. Independent node processes and HTTP transport are implemented for local development; production network hardening remains future work.
-3. Client-facing KV APIs and automatic leader routing are implemented for a single Raft group. Multi-shard routing at the server level remains future work.
-4. The sharding primitives — slot mapping, the versioned shard map, the metadata state machine, the router, ownership checks, and the dispatcher — are implemented and tested in process. Live multi-group Raft deployment and wiring these components into the HTTP and gRPC servers remain planned.
-5. The frontend dashboard is implemented, but unresolved mutation state is not guaranteed to survive page reloads or navigation.
-6. Network-based snapshot installation for followers behind the compacted log boundary is not implemented.
-7. Crash recovery and persistence are tested for selected scenarios, not every possible failure or storage fault.
-8. Exhaustive Raft safety and linearizability verification remain future work.
-9. Production performance and scalability benchmarks have not yet been established.
-
-These limitations distinguish the tested implementation from the
-intended complete distributed database.
-
----
-
-## 26. Key Distributed Systems Concepts
-
-| Concept | Meaning |
-|---|---|
-| Consensus | Agreement among nodes on an ordered sequence of operations |
-| Raft | Leader-based distributed consensus algorithm |
-| Leader | Node coordinating replication |
-| Follower | Node receiving and validating replicated entries |
-| Candidate | Node requesting votes during an election |
-| Term | Logical election epoch |
-| Log Entry | Indexed operation stored in the Raft log |
-| Quorum | Majority of nodes in a Raft group |
-| Commit Index | Highest committed log index |
-| nextIndex | Next log index to send to a follower |
-| matchIndex | Highest index known to be replicated on a follower |
-| No-op | Entry that does not modify application data |
-| Sharding | Partitioning data across multiple groups |
-| WAL | Write-ahead log used for durability |
-| Snapshot | Saved state used for recovery and log compaction |
-| Linearizability | Consistency model where operations appear atomic in real-time order |
-| Failover | Transition to another available node after failure |
-| State Machine | Logic applying committed operations to application data |
-
----
-
-## 27. Project Background
-
-ShardRAFT originated as a group project for **CSE 512 — Distributed Database Systems** at Arizona State University.
-
-The project explores fault-tolerant distributed storage through consensus-based replication, data partitioning, failure recovery, and consistency verification.
-
-The original proposal describes a larger multi-shard distributed key-value database.
-
-Development is being carried out incrementally, with the Raft consensus implementation serving as the initial foundation.
-
-The project emphasizes understanding and testing distributed-systems behavior rather than treating consensus as a black box.
-
----
-
-## 28. References
-
-1. Ongaro, D., and Ousterhout, J. (2014). *In Search of an Understandable Consensus Algorithm.* USENIX Annual Technical Conference.  
-   https://raft.github.io/raft.pdf
-
-2. Raft Consensus Algorithm — Official Resources.  
-   https://raft.github.io/
-
-3. Kleppmann, M. *Designing Data-Intensive Applications.*
-
-4. Jepsen — Distributed Systems Safety Research.  
-   https://jepsen.io/
-
-5. Cooper, B. F., et al. (2010). *Benchmarking Cloud Serving Systems with YCSB.*
-
-6. Gilbert, S., and Lynch, N. (2002). *Brewer's Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web Services.*
-
----
-
-## 29. Final Vision
-
-ShardRAFT aims to evolve from a tested Raft consensus prototype into a complete distributed key-value database.
-
-The intended system will combine:
-
-- Consensus-based replication
-- Persistent key-value storage
-- Automatic leader election
-- Fault tolerance and recovery
-- Hash-based sharding
-- Distributed request routing
-- Backend APIs
-- A web-based management dashboard
-- Performance and correctness evaluation
-
-The goal is to make distributed database behavior understandable, observable, and verifiable through a working implementation.
-
----
-
-**ShardRAFT — Building Distributed Database Systems One Consensus Decision at a Time.**
-
-
-## Implementation and Validation Documentation
-
-- [Request Routing and Leader Redirection](docs/REQUEST_ROUTING.md)
-- [Integration Validation and Benchmark Results](docs/INTEGRATION_VALIDATION.md)
-- [Sharding and the Metadata Group](docs/SHARDING.md)
-- [Development Checklist](docs/CHECKLIST.md)
-
-## ReadIndex and Linearizable Reads
-
-ShardRAFT implements quorum-confirmed linearizable reads
-through its internal shard API.
-
-- Current-term commit requirement.
-- Correlated heartbeat quorum confirmation.
-- Applied-index safety barrier.
-- Concurrent reads, cancellation, and bounded deadlines.
-- Leadership-change and recovery protection.
-- No additional Raft log entry for each read.
-
-The public shard API is `GetLinearizable(ctx, key)`.
-The existing local `Get` API remains available.
-
-Client-facing gRPC KV integration is implemented.
-The existing daemon HTTP GET endpoint is unchanged.
-The standalone HTTP-gRPC gateway provides linearizable
-GET requests by default.
-
-See [ReadIndex architecture and validation](docs/READ_INDEX.md)
-for implementation details, safety guarantees, and test commands.
-
-
-## gRPC Metadata and Client Routing
-
-Steps 7.19 and 7.20 implement:
-
-- gRPC metadata discovery.
-- CRC32 logical hash-slot calculation.
-- Thread-safe metadata caching.
-- Reusable gRPC connections.
-- Leader-aware request routing.
-- Metadata refresh on WRONG_SHARD.
-- Bounded retries and stable mutation identities.
-- Default linearizable reads.
-- Unified GET, PUT, DELETE, and CAS operations.
-
-The current deployment contains one Raft group owning all
-65,536 logical hash slots.
-
-### Final Validation
-
-| Validation | Result |
-|---|---|
-| Unified client tests | 14/14 passed |
-| Repeated client tests | 700/700 passed |
-| Distributed integration tests | 12/12 passed |
-| Repeated distributed tests | 120/120 passed |
-| Combined client statement coverage | 93.9% |
-| Backend package test executions | 42/42 passed |
-| Frontend unit tests | 25/25 passed |
-| Backend and frontend builds | Passed |
-| Static analysis and module verification | Passed |
-
-Browser E2E tests were not rerun for this milestone.
-
-### Documentation
-
-- [gRPC KV Service](docs/GRPC_KV_SERVICE.md)
-- [gRPC Metadata Service](docs/GRPC_METADATA_SERVICE.md)
-- [Shard-Aware gRPC Client](docs/GRPC_CLIENT.md)
-
-Physical sharding, multiple Raft groups, dynamic ownership,
-and shard rebalancing remain future work.
-
-## HTTP-gRPC Gateway
-
-Step 7.21 introduces a standalone HTTP-gRPC gateway
-backed by the shard-aware gRPC client.
-
-### Implemented Features
-
-- HTTP GET, PUT, DELETE, and compare-and-swap.
+## Key Features
+
+### Distributed Consensus
+
+- Custom implementation of the Raft consensus algorithm.
+- Follower, candidate, and leader state transitions.
+- Randomized election timeouts and automatic leader election.
+- Term-based voting and heartbeat communication.
+- Majority-based log replication and commitment.
+- Current-term commit rules and leader no-op entries.
+- Follower catch-up and conflicting-log reconciliation.
+- AppendEntries request-response correlation.
+- Protection against stale and reordered replication responses.
+- Deterministic simulation and consensus invariant testing.
+
+### Durable Storage
+
+- Persistent Raft hard state and replicated logs.
+- Segmented write-ahead logging.
+- Checksummed WAL records.
+- Pebble-backed key-value storage.
+- Snapshot creation and restoration.
+- Log compaction and restart recovery.
+- Persistent mutation deduplication.
+- Independent persistent storage for each deployed node.
+
+### Distributed Database Operations
+
+- GET, PUT, DELETE, and compare-and-swap.
+- Quorum-confirmed linearizable reads through ReadIndex.
+- Explicit local reads for applications that tolerate stale data.
 - Automatic metadata discovery and leader-aware routing.
-- Default quorum-confirmed linearizable reads.
-- Explicit local reads.
-- Strict JSON request validation.
-- Bounded retries and request deadlines.
-- Stable mutation identities and durable deduplication.
-- Structured HTTP error responses.
-- Committed request conflict confirmation.
-- Graceful shutdown and independent gateway restart.
+- Bounded request retries and operation deadlines.
+- Stable mutation identities across retries.
+- Structured error responses and uncertain mutation handling.
 
-### Architecture
+### Physical Sharding
+
+- 65,536 deterministic logical hash slots.
+- Four independent data-shard Raft groups.
+- Three replicas per data shard.
+- Five physical storage nodes.
+- A separate replicated metadata Raft group.
+- Versioned shard maps and ownership validation.
+- Shard-aware gRPC clients and HTTP gateways.
+- Independent replication and leadership within each group.
+
+### Deployment and Observability
+
+- Five-node, two-gateway Docker Compose deployment.
+- Independent named data volumes.
+- Storage-node health and status endpoints.
+- Non-root container runtime.
+- React and TypeScript development dashboard.
+- Database explorer and query console.
+- Cluster status and replication visualization.
+- Controlled node failure and recovery experiments.
+
+### Correctness and Evaluation
+
+- Concurrent operation-history recording.
+- Porcupine single-key linearizability checking.
+- Uniform and Zipfian workload generation.
+- Configurable record sizes and read/write ratios.
+- Throughput and latency percentile measurements.
+- Leader failover and replica recovery measurements.
+- Isolated WAL synchronization cost comparison.
+- Automated experiment execution and raw CSV generation.
+- GitHub Actions build, static analysis, and race-test workflow.
+
+---
+
+## System Architecture
+
+ShardRAFT separates client-facing request handling from replicated
+storage and metadata management.
+
+The multi-Raft deployment runs four independent data groups and
+one metadata group across five storage nodes.
+
+```mermaid
+flowchart TB
+    HC[HTTP Clients]
+    CLI[gRPC Command-Line Client]
+
+    subgraph GatewayLayer["HTTP Gateway Layer"]
+        G1[Gateway 1]
+        G2[Gateway 2]
+    end
+
+    HC --> G1
+    HC --> G2
+
+    G1 --> CLIENT[Shard-Aware gRPC Client]
+    G2 --> CLIENT
+    CLI --> CLIENT
+
+    CLIENT --> META[Replicated Metadata Group]
+    META -. Shard Map .-> CLIENT
+
+    CLIENT --> S1[Shard 1]
+    CLIENT --> S2[Shard 2]
+    CLIENT --> S3[Shard 3]
+    CLIENT --> S4[Shard 4]
+
+    subgraph Storage["Independent Data Raft Groups"]
+        S1 --> R1["Raft Replicas: n1, n2, n3"]
+        S2 --> R2["Raft Replicas: n2, n3, n4"]
+        S3 --> R3["Raft Replicas: n3, n4, n5"]
+        S4 --> R4["Raft Replicas: n4, n5, n1"]
+    end
+
+    R1 --> P1[Persistent Shard Storage]
+    R2 --> P2[Persistent Shard Storage]
+    R3 --> P3[Persistent Shard Storage]
+    R4 --> P4[Persistent Shard Storage]
+
+    META --> MP["Metadata Replicas: n1, n2, n3"]
+```
+
+Each data group maintains its own Raft state, leader,
+replicated log, commit progress, and persistent state machine.
+
+The metadata group maintains the versioned shard map used
+for routing client requests.
+
+### Development Dashboard Architecture
+
+The existing dashboard uses the local development cluster
+and supervisor interfaces. This is distinct from the standalone
+multi-Raft Docker gateway deployment.
 
 ```mermaid
 flowchart LR
-    C[HTTP Client] --> G[HTTP-gRPC Gateway]
-    G --> GC[Shard-Aware gRPC Client]
-    GC --> M[Metadata Service]
-    GC --> N1[Raft Node 1]
-    GC --> N2[Raft Node 2]
-    GC --> N3[Raft Node 3]
+    UI[React Dashboard]
+    SUP[Go Supervisor]
+    API[Daemon HTTP APIs]
+
+    UI --> SUP
+    UI --> API
+    SUP --> N1[Development Node 1]
+    SUP --> N2[Development Node 2]
+    SUP --> N3[Development Node 3]
+
+    API --> N1
+    API --> N2
+    API --> N3
+
     N1 <--> N2
     N2 <--> N3
     N3 <--> N1
 ```
 
-The gateway is an additional client-facing service.
-The existing daemon HTTP API and React dashboard
-remain unchanged.
+The single-shard development mode remains available alongside
+the physical multi-Raft deployment.
 
-### Build and Run
+---
 
-Build the gateway from the repository root:
+## Technology Stack
 
-```bash
-mkdir -p bin
-go build -o bin/shardraft-gateway ./cmd/shardraft-gateway
+| Technology | Purpose |
+|---|---|
+| Go 1.27.3 | Consensus engine, storage, networking, and services |
+| Custom Raft | Distributed consensus and replicated logs |
+| Pebble 1.1.5 | Embedded key-value storage |
+| gRPC 1.72.0 | Node communication and client-facing RPCs |
+| Protocol Buffers 1.36.6 | RPC contracts and message serialization |
+| CRC32 IEEE | Deterministic key-to-slot mapping |
+| React 19 | Interactive database dashboard |
+| TypeScript 5.7 | Typed frontend application |
+| Vite 7 | Frontend development and production build |
+| Lucide React | Dashboard icons |
+| Docker | Containerized services |
+| Docker Compose | Local multi-node deployment |
+| Porcupine 1.0.3 | Single-key linearizability checking |
+| Go testing framework | Backend unit and integration tests |
+| Go race detector | Concurrent memory-access validation |
+| Playwright | Browser end-to-end testing |
+| Python 3 | Validation reporting and experiment aggregation |
+| Bash and Make | Development and experiment automation |
+| GitHub Actions | Automated repository validation |
+
+---
+
+## Repository Structure
+
+The following structure summarizes the tracked repository
+directories and primary entry points.
+
+```text
+ShardRAFT/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── cmd/
+│   ├── bench/                  # Distributed workload generator
+│   ├── chaosctl/               # Docker node failure controls
+│   ├── checker/                # Porcupine correctness checker
+│   ├── shardraft/              # gRPC command-line client
+│   ├── shardraft-bench/        # Original benchmark CLI
+│   ├── shardraft-gateway/      # Standalone HTTP-gRPC gateway
+│   ├── shardraft-supervisor/   # Development cluster supervisor
+│   ├── shardraftd/             # Storage daemon and RPC services
+│   └── walbench/               # WAL synchronization microbenchmark
+├── internal/
+│   ├── benchmark/              # Original benchmark infrastructure
+│   ├── client/                 # Shard-aware gRPC client
+│   ├── history/                # History recorder and checker model
+│   ├── kvstore/                # Persistent KV state machine
+│   ├── meta/                   # Slot mapping and metadata state
+│   ├── observability/          # Cluster observation infrastructure
+│   ├── raft/                   # Custom Raft consensus engine
+│   ├── raftdriver/             # Raft execution and persistence
+│   ├── shard/                  # Shard ownership and group dispatch
+│   ├── simnet/                 # Deterministic cluster simulation
+│   ├── snapshot/               # Snapshot persistence and recovery
+│   ├── transport/              # Node-to-node communication
+│   └── wal/                    # Persistent write-ahead logging
+├── proto/
+│   ├── admin.proto             # Administrative RPC contracts
+│   ├── kv.proto                # Key-value RPC contracts
+│   ├── meta.proto              # Metadata RPC contracts
+│   ├── raft.proto              # Raft transport contracts
+│   └── *.pb.go                 # Generated Go protobuf code
+├── scripts/
+│   ├── cluster-status.sh
+│   ├── dev-cluster.sh
+│   ├── dev.sh
+│   ├── e2e-supervisor.sh
+│   ├── generate-validation-report.py
+│   ├── node-control.sh
+│   ├── run_experiments.sh
+│   └── stop-cluster.sh
+├── test/
+│   ├── integration_test.go
+│   ├── fault_test.go
+│   └── fault_measurement_test.go
+├── web/
+│   ├── src/                    # React application
+│   ├── public/                 # Public and generated assets
+│   ├── tests/                  # Frontend unit tests
+│   ├── e2e/                    # Playwright browser tests
+│   ├── package.json
+│   └── vite.config.ts
+├── docs/                       # Architecture and validation documents
+├── Dockerfile
+├── docker-compose.yml
+├── Makefile
+├── go.mod
+├── go.sum
+├── LICENSE
+└── README.md
 ```
 
-With a compatible gRPC-enabled ShardRAFT cluster running:
+Generated binaries, local cluster data, and experiment results
+are not part of the tracked source tree.
 
-```bash
-./bin/shardraft-gateway \
-  -http-addr 127.0.0.1:8085 \
-  -grpc-endpoints 127.0.0.1:9091,127.0.0.1:9092,127.0.0.1:9093 \
-  -request-timeout 11s
+### Command-Line Applications
+
+| Application | Responsibility |
+|---|---|
+| shardraftd | Runs a storage node in single-shard or multi-Raft mode |
+| shardraft | Executes distributed KV operations through gRPC |
+| shardraft-gateway | Exposes the shard-aware client through HTTP |
+| shardraft-supervisor | Manages and observes the development cluster |
+| shardraft-bench | Original node-oriented benchmark utility |
+| bench | Generates configurable distributed workloads |
+| checker | Evaluates recorded single-key operation histories |
+| chaosctl | Stops, starts, and restarts Docker storage nodes |
+| walbench | Measures isolated file synchronization costs |
+
+---
+
+## Raft Consensus
+
+ShardRAFT implements Raft directly in Go.
+
+Each Raft group independently manages its election term,
+vote state, replicated log, leader identity, commit index,
+and follower replication progress.
+
+### Leader Election
+
+```mermaid
+stateDiagram-v2
+    [*] --> Follower
+    Follower --> Candidate: Election timeout
+    Candidate --> Leader: Majority votes
+    Candidate --> Candidate: Election retry
+    Candidate --> Follower: Valid leader or higher term
+    Leader --> Follower: Higher term
 ```
 
-### Supported HTTP Operations
+A candidate becomes leader after receiving a majority of votes.
 
-| Method | Endpoint | Operation |
+For a three-replica group, two votes are required.
+
+The leader sends heartbeats and coordinates log replication.
+Higher-term messages cause outdated leaders or candidates
+to step down.
+
+### Log Replication
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant L as Shard Leader
+    participant F1 as Follower 1
+    participant F2 as Follower 2
+
+    C->>L: Mutation with request identity
+    Note over L: Append and persist log entry
+
+    par Replicate entry
+        L->>F1: AppendEntries
+        F1-->>L: Persisted acknowledgment
+    and Replicate entry
+        L->>F2: AppendEntries
+        F2-->>L: Persisted acknowledgment
+    end
+
+    Note over L: Majority and commit rules satisfied
+    Note over L: Apply committed operation
+    L-->>C: Mutation result
+    L->>F1: Updated commit index
+    L->>F2: Updated commit index
+```
+
+The leader tracks follower replication using nextIndex
+and matchIndex.
+
+The implementation includes:
+
+- Previous-index and previous-term validation.
+- Rejection of inconsistent log prefixes.
+- Conflict reconciliation without overwriting committed entries.
+- Follower catch-up through replication retries.
+- Current-term majority commitment.
+- Leader no-op entries.
+- Monotonic commit-index progression.
+- Correlated AppendEntries requests and responses.
+
+### Deterministic Simulation
+
+The internal/simnet package supports controlled testing of:
+
+- Logical time and election timeouts.
+- Network partitions.
+- Selective message loss.
+- Delayed and reordered messages.
+- Duplicate replication responses.
+- Leader replacement.
+- Follower recovery.
+- Randomized fault workloads.
+- Consensus safety invariants.
+
+Simulation complements real-network integration testing.
+
+---
+
+## Persistent Storage and Recovery
+
+ShardRAFT persists Raft state and committed database operations
+through its WAL, storage engine, and snapshot infrastructure.
+
+```mermaid
+flowchart LR
+    A[Raft Proposal] --> B[Persistent WAL]
+    B --> C[Replicated Raft Log]
+    C --> D[Majority Commitment]
+    D --> E[KV State Machine]
+    E --> F[Pebble Storage]
+    E --> G[Snapshots]
+    G --> H[Recovery and Log Compaction]
+    B --> H
+```
+
+The storage subsystem includes:
+
+- Persistent Raft terms and voting state.
+- Segmented write-ahead logs.
+- Length-prefixed and checksummed WAL records.
+- Durable replicated command storage.
+- Pebble-backed key-value state.
+- Persistent mutation identity tracking.
+- Snapshot creation and restoration.
+- Log compaction.
+- Recovery from supported restart and crash scenarios.
+
+The production segmented WAL explicitly synchronizes
+records before completing its append path.
+
+The isolated WAL benchmark does not modify production
+durability behavior.
+
+---
+
+## Multi-Raft Sharding
+
+ShardRAFT partitions the key space into 65,536 logical slots.
+
+The slot for a key is calculated using:
+
+```text
+slot = CRC32_IEEE(key) mod 65536
+```
+
+Each key maps deterministically to one slot, and each slot
+belongs to exactly one data shard.
+
+### Shard Placement
+
+| Group | Slot range | Replicas |
 |---|---|---|
-| GET | `/kv/{key}` | Linearizable read by default |
-| PUT | `/kv/{key}` | Insert or update |
-| DELETE | `/kv/{key}` | Delete |
-| POST | `/kv/{key}/cas` | Compare-and-swap |
+| S1 | 0–16,383 | n1, n2, n3 |
+| S2 | 16,384–32,767 | n2, n3, n4 |
+| S3 | 32,768–49,151 | n3, n4, n5 |
+| S4 | 49,152–65,535 | n4, n5, n1 |
+| Metadata | Not applicable | n1, n2, n3 |
 
-All mutations require a client_id and request_id.
-Retries must preserve the original mutation identity
-and operation contents.
+### Physical Replica Distribution
 
-Explicit local reads are available through
-`?read_mode=local` and may return stale data.
+| Node | S1 | S2 | S3 | S4 | Metadata |
+|---|:---:|:---:|:---:|:---:|:---:|
+| n1 | Yes | — | — | Yes | Yes |
+| n2 | Yes | Yes | — | — | Yes |
+| n3 | Yes | Yes | Yes | — | Yes |
+| n4 | — | Yes | Yes | Yes | — |
+| n5 | — | — | Yes | Yes | — |
 
-### Gateway Validation
+Every data shard has three replicas and requires two
+available, communicating replicas to maintain a quorum.
 
-| Validation | Result |
-|---|---|
-| Gateway test functions | 78 |
-| Gateway unit test functions | 59 |
-| Distributed test functions | 19 |
-| Distributed baseline | 19/19 passed |
-| Distributed shuffled stress | 95/95 passed |
-| Distributed race validation | 57/57 passed |
-| Complete gateway suite | 78/78 passed |
-| Total distributed executions | 190/190 passed |
-| Gateway unit statement coverage | 95.5% |
-| gRPC client statement coverage | 92.5% |
-| Backend package regression | Passed |
-| Backend package race regression | Passed |
-| Build and static analysis | Passed |
-| Module and dependency validation | Passed |
+A single physical node failure leaves a majority in
+each group, assuming the remaining nodes are healthy.
 
-Distributed tests cover:
+Two simultaneous physical node failures may remove
+the quorum from one or more groups.
 
-- Bootstrap discovery through a follower.
-- CRUD, CAS, and read consistency modes.
-- Leader failover and durable request deduplication.
-- Conflicting request identities.
-- Quorum loss and recovery.
-- Concurrent mutations and replica convergence.
-- Complete backend unavailability and recovery.
-- Independent gateway restart.
-- Historical mutation replay after gateway restart.
+### Implemented Sharding Mechanisms
 
-The distributed fixture uses three independent daemon
-processes, real network connections, and isolated
-temporary persistent storage.
+- Deterministic CRC32 slot calculation.
+- Contiguous slot-range validation.
+- Unique shard and replica validation.
+- Ownership-enforcing shard wrappers.
+- Typed wrong-shard errors.
+- Local group dispatch.
+- Independent physical Raft groups.
+- Persistent metadata replication.
+- End-to-end operations across all four data shards.
 
-### Compatibility and Limitations
+Multi-Raft mode is enabled through the storage daemon's
+-multi-raft flag and is used by Docker Compose.
 
-The gateway preserves existing HTTP endpoints and
-gRPC service methods. The conflict_committed field
-is an additive protobuf extension.
+Live shard migration and dynamic rebalancing are outside
+the implemented scope.
 
-The current deployment contains one Raft group owning
-all 65,536 logical hash slots.
+---
 
-Physical multi-shard deployment, dynamic shard migration,
-production security hardening, and exhaustive consistency
-verification remain future work.
+## Metadata and Request Routing
 
-Browser E2E tests were not rerun for this milestone.
+The metadata group maintains a versioned shard map.
 
-See [HTTP-gRPC Gateway](docs/HTTP_GRPC_GATEWAY.md)
-for configuration, API examples, architecture,
-error handling, and reproducible validation commands.
+The metadata state machine validates ownership ranges,
+replica placement, and expected-version transitions.
 
-## gRPC Command-Line Client
+Rejected metadata updates leave the state unchanged.
 
-Step 7.22 introduces a standalone command-line client backed
-by the shard-aware gRPC client.
+The shard-aware gRPC client provides:
 
-### Implemented Features
+- Automatic metadata discovery.
+- Thread-safe shard-map caching.
+- Reusable gRPC connections.
+- Deterministic slot lookup.
+- Leader-aware request routing.
+- Metadata refresh following WRONG_SHARD errors.
+- Bounded retries.
+- Stable mutation identities.
+- Structured error propagation.
 
-- GET, PUT, DELETE, and compare-and-swap.
-- Automatic metadata discovery and leader-aware routing.
-- Linearizable reads by default and explicit local reads.
-- JSON and human-readable text output.
-- Configurable bootstrap endpoints and operation deadlines.
-- Automatic and explicit mutation identities.
-- Durable deduplication and uncertain mutation recovery.
-- Structured exit codes and graceful cancellation.
+```mermaid
+flowchart TD
+    A[Client Request] --> B[Calculate Key Slot]
+    B --> C[Consult Cached Shard Map]
+    C --> D[Identify Owning Raft Group]
+    D --> E[Send Request to Replica]
+    E --> F{Request Result}
 
-### Build and Usage
+    F -->|Success| G[Return Result]
+    F -->|Not Leader| H[Refresh Leader Information]
+    F -->|Wrong Shard| I[Refresh Metadata]
+    F -->|Retryable Failure| J[Bounded Retry]
+    F -->|Terminal Failure| K[Return Structured Error]
 
-```bash
-mkdir -p bin
-go build -o bin/shardraft ./cmd/shardraft
-
-./bin/shardraft --help
-./bin/shardraft put balance 100
-./bin/shardraft get balance
-./bin/shardraft cas balance 100 200
-./bin/shardraft delete balance
+    H --> J
+    I --> J
+    J --> E
 ```
 
-These operations require a running gRPC-enabled cluster.
+Metadata discovery exposes locally committed metadata.
+It is not itself a linearizable read operation.
 
-### CLI Validation
+---
 
-| Validation | Result |
-|---|---|
-| Unit test functions | 127 |
-| Distributed test functions | 30 |
-| Final distributed normal executions | 150/150 passed |
-| Final distributed race executions | 60/60 passed |
-| CLI unit statement coverage | 98.1% |
-| Final repository package regression | 17/17 passed |
-| Build, static analysis, and module verification | Passed |
+## Consistency and Request Deduplication
 
-Distributed validation covers CRUD, CAS, bootstrap discovery,
-leader failover, durable deduplication, quorum loss, recovery,
-and concurrent operations.
+### Linearizable Reads
 
-The existing backend, gateway, protobuf contracts, and Go
-module dependencies remain unchanged by this milestone.
+The default gRPC and standalone HTTP gateway read mode
+uses the ReadIndex mechanism.
 
-Physical multi-shard deployment remains future work.
+ReadIndex provides:
 
-See [ShardRAFT gRPC CLI](docs/GRPC_CLI.md) for configuration,
-command examples, exit codes, mutation recovery, and limitations.
+- A current-term commitment requirement.
+- Correlated heartbeat quorum confirmation.
+- An applied-index safety barrier.
+- Concurrent read support.
+- Cancellation and bounded deadlines.
+- Leadership-change protection.
 
-## Final gRPC Integration Acceptance
+A linearizable read does not require a new Raft log
+entry for every GET request.
 
-The gRPC CLI, HTTP gateway and legacy daemon HTTP GET
-interface have been validated against the same isolated
-three-node cluster.
+Explicit local reads are also supported, but may
+return stale data.
 
-Cross-interface mutation replay and identity conflict
-handling passed without additional committed entries.
+The legacy daemon HTTP GET interface is distinct
+from the standalone gateway's default linearizable GET.
 
-See [gRPC Integration Acceptance](docs/GRPC_ACCEPTANCE.md)
-for the final results, acceptance scope and limitations.
+### Mutation Identity
 
-Physical multi-shard execution remains part of Step 8.
+Each mutation is identified using:
 
-## Multi-Raft Sharding and Metadata
+```text
+(client_id, request_id)
+```
 
-ShardRAFT supports five storage nodes, four independent
-data-shard Raft groups and one replicated metadata group.
+Retries preserve the original identity and operation contents.
 
-- 65,536 deterministic hash slots.
-- Three replicas per data shard.
-- Persistent, versioned metadata.
-- Automatic shard-map discovery.
-- Shard-aware KV request routing.
-- Linearizable reads and mutation deduplication.
-- Successful end-to-end validation across all four shards.
+The replicated state machine records mutation results
+to support duplicate request handling.
 
-Multi-Raft mode is enabled with the `-multi-raft` flag.
-The existing single-shard mode remains available.
+This prevents a successfully committed historical mutation
+from being applied again merely because a client retries it.
 
-See [Multi-Raft Acceptance](docs/MULTI_RAFT_ACCEPTANCE.md)
-for implementation details, validation results and limitations.
+Conflicting reuse of a mutation identity is rejected.
 
-## Local Docker Deployment
+An uncertain mutation outcome must not be interpreted
+as proof that the operation failed to commit.
 
-ShardRAFT supports a local Docker Compose deployment
-with five multi-Raft storage nodes, two HTTP gateways,
-independent persistent volumes and storage health checks.
+Deduplication is scoped to the relevant replicated
+state machine rather than a global cross-shard transaction.
 
-Start the deployment:
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Go version specified in go.mod.
+- Git.
+- Docker Engine or Docker Desktop.
+- Docker Compose.
+- Node.js and npm for frontend development.
+- Python 3 for validation and experiment scripts.
+
+### Clone and Build
+
+```bash
+git clone https://github.com/KrishShah1912/ShardRAFT.git
+cd ShardRAFT
+
+go version
+go mod download
+go mod verify
+go build ./...
+```
+
+### Development Commands
+
+```bash
+make build
+make test
+make race
+make vet
+```
+
+The repository also provides development-cluster,
+supervisor, frontend, and validation commands through
+the Makefile.
+
+---
+
+## Docker Deployment
+
+The recommended way to run the physical multi-Raft
+database is through Docker Compose.
+
+### Start the Cluster
 
 ```bash
 docker compose up -d --build --wait
 docker compose ps
 ```
 
-Gateway endpoints:
+The deployment starts:
 
-- Gateway 1: `http://127.0.0.1:18091`
-- Gateway 2: `http://127.0.0.1:18092`
+- Five storage daemons.
+- Two standalone HTTP-gRPC gateways.
+- Five independent named data volumes.
+- A shared Docker network.
+- Storage-node health checks.
 
-The deployment includes a host-side `chaosctl` CLI
-and opt-in Docker integration and fault tests.
+The shared multi-stage Docker image runs its
+services as a non-root user.
 
-See [Local Deployment Guide](docs/DEPLOYMENT.md)
-for configuration, usage, validation and limitations.
+### Service Endpoints
 
-## Correctness and Performance Evaluation
+| Service | Host endpoint |
+|---|---|
+| Storage node 1 | http://127.0.0.1:18081/status |
+| Storage node 2 | http://127.0.0.1:18082/status |
+| Storage node 3 | http://127.0.0.1:18083/status |
+| Storage node 4 | http://127.0.0.1:18084/status |
+| Storage node 5 | http://127.0.0.1:18085/status |
+| Gateway 1 | http://127.0.0.1:18091 |
+| Gateway 2 | http://127.0.0.1:18092 |
 
-ShardRAFT includes evaluation tools for recording operation histories,
-checking single-key linearizability with Porcupine, generating configurable
-uniform and Zipfian workloads, and measuring throughput, latency,
-failover, recovery, and isolated WAL synchronization costs.
+Internal gRPC communication uses port 9090
+within the Docker network.
+
+### Quick Smoke Test
+
+Write through gateway 1:
+
+```bash
+curl -X PUT http://127.0.0.1:18091/kv/example \
+  -H 'Content-Type: application/json' \
+  -d '{"value":"hello","client_id":"demo","request_id":"write-1"}'
+```
+
+Read through gateway 2:
+
+```bash
+curl http://127.0.0.1:18092/kv/example
+```
+
+Expected read result:
+
+```json
+{
+  "key": "example",
+  "value": "hello",
+  "found": true
+}
+```
+
+These examples assume a fresh demonstration key and
+mutation identity. Use new identities for new operations.
+
+### Stop and Resume
+
+Stop services without removing persistent volumes:
+
+```bash
+docker compose stop
+```
+
+Resume the existing deployment:
+
+```bash
+docker compose up -d --no-build --wait
+```
+
+Remove containers and the network while retaining
+named volumes:
+
+```bash
+docker compose down
+```
+
+See [Local Docker Deployment](docs/DEPLOYMENT.md)
+for the complete deployment guide.
+
+---
+
+## HTTP API
+
+The standalone gateway exposes the following endpoints.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | /kv/{key} | Linearizable read by default |
+| PUT | /kv/{key} | Insert or update a value |
+| DELETE | /kv/{key} | Remove a key |
+| POST | /kv/{key}/cas | Compare-and-swap |
+
+### PUT
+
+```bash
+curl -X PUT http://127.0.0.1:18091/kv/balance \
+  -H 'Content-Type: application/json' \
+  -d '{"value":"100","client_id":"demo","request_id":"balance-1"}'
+```
+
+### GET
+
+```bash
+curl http://127.0.0.1:18092/kv/balance
+```
+
+### Explicit Local GET
+
+```bash
+curl 'http://127.0.0.1:18092/kv/balance?read_mode=local'
+```
+
+Local reads may return stale data.
+
+### Compare-and-Swap
+
+```bash
+curl -X POST http://127.0.0.1:18091/kv/balance/cas \
+  -H 'Content-Type: application/json' \
+  -d '{"expected":"100","value":"200","client_id":"demo","request_id":"balance-2"}'
+```
+
+CAS updates the value only when the current stored
+value matches the expected value.
+
+### DELETE
+
+```bash
+curl -X DELETE http://127.0.0.1:18091/kv/balance \
+  -H 'Content-Type: application/json' \
+  -d '{"client_id":"demo","request_id":"balance-3"}'
+```
+
+### Error Handling
+
+The gateway supports structured error responses for:
+
+- Invalid requests.
+- Missing keys.
+- Conflicting mutation identities.
+- Unavailable storage services.
+- Request deadlines.
+- Uncertain mutation outcomes.
+
+All mutations require client_id and request_id.
+
+See [HTTP-gRPC Gateway](docs/HTTP_GRPC_GATEWAY.md)
+for the complete API contract.
+
+---
+
+## gRPC Services and CLI
+
+ShardRAFT defines its RPC contracts using Protocol Buffers.
+
+| Service | Responsibility |
+|---|---|
+| RaftService | Consensus message transport |
+| AdminService | Node administration and status |
+| KVService | Distributed key-value operations |
+| MetaService | Shard-map and metadata discovery |
+
+The contracts and generated Go bindings are located
+in the proto directory.
+
+### Build the CLI
+
+```bash
+mkdir -p bin
+go build -o bin/shardraft ./cmd/shardraft
+
+./bin/shardraft --help
+```
+
+### Use the CLI with Docker
+
+The Docker image includes the gRPC command-line client.
+
+```bash
+docker compose exec -T n1 shardraft \
+  --grpc-endpoints=n1:9090,n2:9090,n3:9090 \
+  put cli-example hello
+```
+
+```bash
+docker compose exec -T n1 shardraft \
+  --grpc-endpoints=n1:9090,n2:9090,n3:9090 \
+  get cli-example
+```
+
+```bash
+docker compose exec -T n1 shardraft \
+  --grpc-endpoints=n1:9090,n2:9090,n3:9090 \
+  cas cli-example hello updated
+```
+
+```bash
+docker compose exec -T n1 shardraft \
+  --grpc-endpoints=n1:9090,n2:9090,n3:9090 \
+  delete cli-example
+```
+
+The CLI supports configurable bootstrap endpoints,
+operation deadlines, JSON or text output, explicit
+mutation identities, and structured exit codes.
+
+See [gRPC CLI Documentation](docs/GRPC_CLI.md).
+
+---
+
+## Web Dashboard
+
+ShardRAFT includes an interactive React and TypeScript
+dashboard for the local development environment.
+
+The dashboard provides interfaces for:
+
+- Database exploration.
+- Key-value operations.
+- Query execution.
+- Cluster monitoring.
+- Node roles and Raft terms.
+- Commit and replication progress.
+- Controlled node failure experiments.
+- Benchmark and validation reporting.
+
+### Start the Development Dashboard
+
+From the repository root:
+
+```bash
+cd web
+npm ci
+cd ..
+
+make dev
+```
+
+Open:
+
+http://localhost:5173
+
+The development supervisor and local cluster scripts
+support the existing dashboard workflow.
+
+### Frontend Validation
+
+```bash
+cd web
+npm test
+npm run build
+```
+
+Browser end-to-end testing is available through
+Playwright:
+
+```bash
+npx playwright install
+npm run test:e2e
+```
+
+The dashboard development workflow is separate from
+the seven-service multi-Raft Docker deployment.
+
+---
+
+## Fault Tolerance
+
+Each three-replica Raft group can continue committing
+operations with one unavailable replica, provided
+the remaining two replicas can communicate.
+
+### Validated Failure Scenarios
+
+- Leader loss and replacement.
+- Follower loss.
+- Quorum loss and subsequent recovery.
+- Network partitions and message loss.
+- Delayed and reordered replication responses.
+- Persistent state recovery after supported restarts.
+- Preservation of committed values.
+- Duplicate request retries following leader replacement.
+- Replica catch-up after restart.
+- Independent gateway restart and request recovery.
+
+### Chaos Control CLI
+
+Build the host-side tool:
+
+```bash
+mkdir -p bin
+go build -o bin/chaosctl ./cmd/chaosctl
+```
+
+Inspect the local deployment:
+
+```bash
+./bin/chaosctl status
+```
+
+For a controlled experiment on the local test cluster:
+
+```bash
+./bin/chaosctl stop n1
+./bin/chaosctl start n1
+./bin/chaosctl restart n1
+```
+
+The Docker fault tests use graceful container stops
+and restarts rather than abrupt power-loss scenarios.
+
+### Reproduce Integration Tests
+
+Start the Docker cluster before executing these tests.
+
+```bash
+SHARDRAFT_DOCKER_TEST=1 go test -v ./test \
+  -run '^TestDockerMultiShardIntegration$' \
+  -count=1 -timeout=90s
+```
+
+```bash
+SHARDRAFT_DOCKER_TEST=1 go test -v ./test \
+  -run '^TestDocker(LeaderFailover|FollowerLoss)$' \
+  -count=1 -timeout=240s
+```
+
+These tests validate multi-shard operations, leader
+replacement, committed-value preservation, request
+deduplication, and replica recovery.
+
+---
+
+## Correctness Verification
+
+ShardRAFT records concurrent operation histories and
+uses Porcupine to evaluate single-key linearizability.
+
+### History Recording
+
+Each recorded operation contains:
+
+- Operation identifier.
+- Client and request identity.
+- Operation type and key.
+- Input and output values.
+- Invocation and completion timestamps.
+- Operation outcome.
+- Error information when applicable.
+
+### Linearizability Checker
+
+The checker evaluates operation histories against a
+key-value state machine model that includes mutation
+deduplication.
+
+Supported verdicts:
+
+| Verdict | Meaning |
+|---|---|
+| LINEARIZABLE | The recorded history admits a legal ordering |
+| ILLEGAL | The recorded history violates the modeled semantics |
+| UNKNOWN | Available evidence is insufficient for a conclusive verdict |
+
+Failed, pending, or uncertain operations are retained
+rather than silently discarded.
+
+The benchmark uses fresh key namespaces with an
+initially empty state and no external writes.
+
+### Build and Run
+
+```bash
+mkdir -p bin
+go build -o bin/checker ./cmd/checker
+```
+
+```bash
+./bin/checker \
+  -history path/to/history.json \
+  -assume-empty \
+  -timeout 30s \
+  -json
+```
+
+Replace the example path with an actual generated
+history file.
+
+The checker validates recorded single-key histories.
+It is not a formal proof of Raft correctness or
+multi-key transaction consistency.
+
+---
+
+## Performance Evaluation
+
+ShardRAFT includes a configurable distributed benchmark
+and an automated experiment runner.
+
+### Benchmark Configuration
+
+The benchmark supports:
+
+- Uniform and Zipfian key distributions.
+- Configurable request counts.
+- Concurrent workers.
+- Configurable key-space size.
+- Read/write ratios.
+- Record sizes.
+- Reproducible random seeds.
+- Multiple HTTP gateway targets.
+- Raw operation-history and CSV generation.
+
+### Build the Benchmark
+
+```bash
+mkdir -p bin
+
+go build -o bin/bench ./cmd/bench
+go build -o bin/checker ./cmd/checker
+go build -o bin/walbench ./cmd/walbench
+```
+
+### Execute a Workload
+
+With the Docker cluster running:
+
+```bash
+./bin/bench \
+  -targets http://127.0.0.1:18091,http://127.0.0.1:18092 \
+  -requests 1000 \
+  -concurrency 4 \
+  -keys 100 \
+  -distribution uniform \
+  -read-ratio 0.5 \
+  -value-size 128 \
+  -seed 42 \
+  -output results
+```
+
+### Automated Experiments
+
+Preview the experiment matrix without running workloads:
 
 ```bash
 ./scripts/run_experiments.sh --dry-run
-./scripts/run_experiments.sh smoke
-./scripts/run_experiments.sh full
 ```
 
-See [Correctness and Performance Evaluation](docs/PERFORMANCE.md)
-for reproduction commands, measured results, raw artifact descriptions,
-and measurement limitations.
+Execute a small smoke experiment:
 
-Generated experiment results are stored under `results/`.
+```bash
+./scripts/run_experiments.sh smoke
+```
+
+Execute the complete experiment matrix:
+
+```bash
+REQUESTS=1000 KEYS=100 REPEATS=1 \
+  ./scripts/run_experiments.sh full
+```
+
+### Distributed Benchmark Results
+
+The measured deployment consisted of five storage nodes,
+four data shards, one replicated metadata group,
+and two HTTP gateways.
+
+Each experiment executed 1,000 operations.
+
+All 8,000 operations succeeded, and all eight recorded
+histories were classified as LINEARIZABLE.
+
+| Workload | Ops/sec | p50 (ms) | p95 (ms) | p99 (ms) |
+|---|---:|---:|---:|---:|
+| Baseline | 571.60 | 10.775 | 12.314 | 14.197 |
+| Zipfian | 595.72 | 10.674 | 12.130 | 13.357 |
+| Read-heavy | 1483.75 | 1.408 | 11.600 | 12.481 |
+| Write-heavy | 375.63 | 11.388 | 12.538 | 13.432 |
+| 1 KiB records | 568.49 | 4.500 | 12.474 | 13.160 |
+| 4 KiB records | 520.26 | 4.861 | 13.205 | 14.740 |
+| Concurrency 1 | 147.41 | 2.931 | 12.929 | 14.367 |
+| Concurrency 16 | 834.72 | 15.044 | 44.536 | 60.005 |
+
+### Throughput Comparison
+
+```mermaid
+xychart-beta
+    title "Distributed Workload Throughput"
+    x-axis ["Baseline", "Zipfian", "Read-heavy", "Write-heavy", "1 KiB", "4 KiB", "C1", "C16"]
+    y-axis "Operations per second" 0 --> 1600
+    bar [571.60, 595.72, 1483.75, 375.63, 568.49, 520.26, 147.41, 834.72]
+```
+
+### Observations
+
+- The read-heavy workload achieved the highest measured
+  throughput at 1,483.75 operations per second.
+- Increasing concurrency from one to sixteen workers
+  increased measured throughput by approximately 5.66x.
+- Higher concurrency also increased tail latency.
+- The 4 KiB record workload achieved lower throughput
+  than the 128-byte baseline.
+- All eight recorded histories passed the checker.
+
+These observations are based on one repetition per
+workload and should not be generalized to production
+environments.
+
+### Failover and Recovery
+
+| Measurement | Duration |
+|---|---:|
+| Docker stop | 325.293 ms |
+| Post-stop election wait | 922.101 ms |
+| End-to-end failover | 1337.355 ms |
+| Node startup | 440.514 ms |
+| Replica recovery | 948.523 ms |
+
+The measured leader failover occurred in shard S1.
+
+The experiment verified committed-value preservation,
+duplicate request protection, successful operations
+after leader replacement, and replica catch-up.
+
+The measurements include Docker and polling overhead.
+
+### WAL Synchronization Microbenchmark
+
+The isolated WAL-style benchmark compares explicit
+file synchronization policies.
+
+Each policy writes 10,000 records of 1,024 bytes.
+
+| Mode | Durability | Sync calls | Records/sec | p99 (ms) |
+|---|---|---:|---:|---:|
+| Always-sync | Stronger | 10000 | 268.97 | 6.054459 |
+| Timed-sync | Weaker | 11 | 63222.73 | 0.041959 |
+| No-sync | Weaker | 0 | 121306.53 | 0.077167 |
+
+Run the microbenchmark:
+
+```bash
+./bin/walbench \
+  -records 10000 \
+  -record-size 1024 \
+  -sync-interval 10ms \
+  -output results
+```
+
+Timed synchronization is checked at write boundaries.
+Remaining timed-mode records are synchronized at the
+end of the workload.
+
+No-sync performs no explicit file synchronization.
+
+These results isolate file synchronization costs.
+They do not measure distributed database throughput,
+and they do not change the production WAL configuration.
+
+### Raw Experiment Artifacts
+
+Generated artifacts are stored under results/.
+
+| Artifact | Purpose |
+|---|---|
+| operations.csv | Individual operation measurements |
+| history.json | Recorded correctness history |
+| summary.json | Workload performance statistics |
+| config.json | Workload configuration |
+| checker.json | Linearizability verdict |
+| experiment-summary.csv | Aggregated workload measurements |
+| fault-metrics.csv | Failover and recovery measurements |
+| wal-sync-summary.csv | WAL synchronization comparison |
+| wal-sync-operations.csv | Individual WAL record timings |
+
+Raw results are generated automatically and are
+excluded from version control.
+
+See [Correctness and Performance Evaluation](docs/PERFORMANCE.md)
+for detailed results, reproduction commands, and limitations.
+
+---
+
+## Testing and Continuous Integration
+
+ShardRAFT combines deterministic simulation, backend
+unit tests, distributed integration tests, frontend
+tests, fault experiments, and recorded-history checking.
+
+### Backend Validation
+
+```bash
+go mod verify
+go build ./...
+go vet ./...
+go test ./...
+go test -race ./...
+```
+
+### Focused Tests
+
+```bash
+go test -v ./internal/raft
+go test -v ./internal/simnet
+go test -v ./internal/wal
+go test -v ./internal/kvstore
+go test -v ./internal/meta
+go test -v ./internal/shard
+go test -v ./internal/history
+```
+
+### Multi-Raft Integration
+
+```bash
+go test -v -count=1 -timeout=60s \
+  -run '^TestMultiShardEndToEnd$' ./cmd/shardraftd
+```
+
+### Validation Coverage
+
+The implemented test suites cover:
+
+- Leader election and voting.
+- Majority-based log commitment.
+- Replication request correlation.
+- Log consistency and follower catch-up.
+- Persistent state and snapshot recovery.
+- Linearizable ReadIndex operations.
+- Durable mutation deduplication.
+- Metadata state-machine validation.
+- Deterministic shard ownership.
+- gRPC service contracts.
+- Automatic client routing and retries.
+- HTTP gateway behavior.
+- Command-line client behavior.
+- Cross-component interoperability.
+- Physical multi-shard execution.
+- Docker leader and follower failure.
+- Operation history recording.
+- Porcupine correctness checking.
+- Benchmark configuration and result generation.
+- Frontend routing and browser integration.
+
+### Final Local Validation
+
+| Validation | Result |
+|---|---|
+| Go module verification | Passed |
+| Repository build | Passed |
+| Repository-wide Go vet | Passed |
+| Repository-wide race suite | Passed |
+| Packages containing tests | 22/22 passed |
+| Distributed workload histories | 8/8 linearizable |
+| Docker multi-shard integration | Passed |
+| Docker leader failover | Passed |
+| Docker follower recovery | Passed |
+
+The final local race suite reused successful cached
+test results where applicable.
+
+Docker-specific tests are opt-in and were validated
+separately from the default race suite.
+
+### GitHub Actions
+
+The workflow in .github/workflows/ci.yml runs on
+pull requests and pushes targeting main.
+
+```mermaid
+flowchart LR
+    A[Push or Pull Request] --> B[Checkout]
+    B --> C[Set Up Go]
+    C --> D[Verify Dependencies]
+    D --> E[Build]
+    E --> F[Go Vet]
+    F --> G[Race Tests]
+```
+
+The workflow uses an Ubuntu runner, the Go version
+specified in go.mod, dependency caching, and
+repository-wide build and race validation.
+
+Docker-specific opt-in tests are disabled in the
+default CI workflow.
+
+The live CI badge at the top of this README
+reflects the GitHub Actions workflow status.
+
+---
+
+## Implementation Milestones
+
+| Milestone | Implementation status |
+|---|---|
+| Repository foundation and tooling | Complete |
+| Raft interfaces and core architecture | Complete |
+| Deterministic simulation and leader election | Complete |
+| Log replication and commitment | Complete |
+| Persistent WAL, snapshots, and recovery | Complete |
+| Key-value state machine | Complete |
+| gRPC services, client, gateway, and routing | Complete |
+| Physical sharding and replicated metadata | Complete |
+| Local Docker deployment and fault testing | Complete |
+| Correctness and performance tools | Complete |
+| GitHub Actions CI configuration | Complete |
+
+The planned feature implementation is complete.
+
+See [Development Checklist](docs/CHECKLIST.md)
+for detailed acceptance records and outstanding
+verification entries.
+
+---
+
+## Documentation
+
+### Architecture and Distributed Services
+
+| Document | Description |
+|---|---|
+| [Request Routing](docs/REQUEST_ROUTING.md) | Leader discovery, retries, and forwarding |
+| [ReadIndex](docs/READ_INDEX.md) | Quorum-confirmed linearizable reads |
+| [gRPC KV Service](docs/GRPC_KV_SERVICE.md) | Distributed KV RPC implementation |
+| [gRPC Metadata Service](docs/GRPC_METADATA_SERVICE.md) | Metadata discovery and service contracts |
+| [Shard-Aware gRPC Client](docs/GRPC_CLIENT.md) | Client routing, caching, and retries |
+| [HTTP-gRPC Gateway](docs/HTTP_GRPC_GATEWAY.md) | HTTP endpoints and error contracts |
+| [gRPC CLI](docs/GRPC_CLI.md) | Command-line usage and validation |
+| [Sharding](docs/SHARDING.md) | Slot mapping and metadata state machine |
+
+### Deployment and Validation
+
+| Document | Description |
+|---|---|
+| [Integration Validation](docs/INTEGRATION_VALIDATION.md) | Earlier integration and benchmark results |
+| [gRPC Acceptance](docs/GRPC_ACCEPTANCE.md) | Cross-component integration acceptance |
+| [Multi-Raft Acceptance](docs/MULTI_RAFT_ACCEPTANCE.md) | Physical multi-shard validation |
+| [Docker Deployment](docs/DEPLOYMENT.md) | Five-node, two-gateway deployment |
+| [Performance Evaluation](docs/PERFORMANCE.md) | Correctness and measured performance |
+| [Development Checklist](docs/CHECKLIST.md) | Implementation and acceptance tracking |
+
+Some milestone documents describe historical
+implementation stages. This README summarizes
+the final integrated project state.
+
+---
+
+## Limitations
+
+ShardRAFT is an academic distributed database
+implementation intended for local development,
+experimentation, and demonstration.
+
+The following limitations remain:
+
+- Physical shard placement is fixed.
+- Live shard migration and dynamic rebalancing are not implemented.
+- Dynamic metadata updates are not synchronized with physical ownership changes.
+- Metadata discovery is not linearizable.
+- Multi-key distributed transactions are not implemented.
+- Hash-based sharding does not preserve natural key ordering.
+- Network-based snapshot installation for followers beyond the compacted log boundary is not implemented.
+- Production authentication, authorization, and network security hardening are outside the current scope.
+- Storage health checks verify daemon responsiveness rather than quorum availability.
+- Gateways do not expose dedicated health endpoints.
+- Dashboard unresolved mutation state is not guaranteed to survive page reloads.
+- Docker fault measurements use graceful container stops and restarts.
+- The Docker fault tests do not establish power-loss durability.
+- Replica recovery measurements include catch-up and polling overhead.
+- The Porcupine checker evaluates recorded single-key histories rather than all possible executions.
+- Distributed performance experiments use one repetition per workload.
+- WAL synchronization measurements are isolated microbenchmarks.
+- Production-scale performance and horizontal scaling have not been established.
+
+These limitations distinguish the validated project
+implementation from a production-ready distributed
+database service.
+
+---
+
+## Team
+
+ShardRAFT was developed as a collaborative academic
+project for CSE 512 — Distributed Database Systems
+at Arizona State University.
+
+| Team Member |
+|---|
+| Krish Shah |
+| Hetansh Patel |
+| Sri Veda |
+
+The project combines consensus implementation,
+persistent storage, distributed networking, frontend
+development, integration, deployment, and experimental
+evaluation.
+
+See the repository's Git history and contributor
+records for individual contributions.
+
+---
+
+## References
+
+1. Diego Ongaro and John Ousterhout.
+   *In Search of an Understandable Consensus Algorithm.*
+   USENIX Annual Technical Conference, 2014.
+   https://raft.github.io/raft.pdf
+
+2. Raft Consensus Algorithm.
+   https://raft.github.io/
+
+3. Martin Kleppmann.
+   *Designing Data-Intensive Applications.*
+
+4. Brian F. Cooper et al.
+   *Benchmarking Cloud Serving Systems with YCSB.*
+   2010.
+
+5. Seth Gilbert and Nancy Lynch.
+   *Brewer's Conjecture and the Feasibility of Consistent,
+   Available, Partition-Tolerant Web Services.*
+   2002.
+
+6. Porcupine — Linearizability Checker.
+   https://github.com/anishathalye/porcupine
+
+7. Pebble — Embedded Key-Value Storage Engine.
+   https://github.com/cockroachdb/pebble
+
+8. gRPC Documentation.
+   https://grpc.io/docs/
+
+9. Jepsen — Distributed Systems Safety Research.
+   https://jepsen.io/
+
+---
+
+## License
+
+ShardRAFT is licensed under the Apache License, Version 2.0.
+
+See [LICENSE](LICENSE) for the complete license terms.
+
+---
+
+**ShardRAFT — Building Distributed Database Systems
+One Consensus Decision at a Time.**
