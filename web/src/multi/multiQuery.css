@@ -1,0 +1,302 @@
+.mq-console {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.mq-console * {
+  box-sizing: border-box;
+}
+
+.mq-heading,
+.mq-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mq-heading h1 {
+  margin: 6px 0;
+  font-size: 30px;
+}
+
+.mq-heading p,
+.mq-muted {
+  opacity: .68;
+}
+
+.mq-eyebrow {
+  font-size: 11px;
+  letter-spacing: .12em;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.mq-tag {
+  color: #38bdf8;
+  border: 1px solid #38bdf855;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.mq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.mq-panel {
+  border: 1px solid #94a3b833;
+  border-radius: 14px;
+  padding: 22px;
+  background: #94a3b808;
+  min-width: 0;
+}
+
+.mq-panel h2 {
+  margin: 0 0 18px;
+  font-size: 18px;
+}
+
+.mq-panel h3 {
+  font-size: 14px;
+  margin: 20px 0 12px;
+}
+
+.mq-panel form {
+  display: grid;
+  gap: 15px;
+}
+
+.mq-panel label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.mq-panel input:not([type="checkbox"]),
+.mq-panel select,
+.mq-panel textarea {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #94a3b844;
+  border-radius: 8px;
+  background: #94a3b80c;
+  color: inherit;
+  font: inherit;
+}
+
+.mq-panel select option {
+  background: #172033;
+  color: #f8fafc;
+}
+
+.mq-panel textarea {
+  resize: vertical;
+}
+
+.mq-panel button {
+  border: 1px solid #94a3b844;
+  border-radius: 8px;
+  background: #94a3b810;
+  color: inherit;
+  padding: 9px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.mq-panel button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.mq-operations {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.mq-panel .mq-active {
+  color: #38bdf8;
+  border-color: #38bdf8;
+  background: #38bdf81a;
+}
+
+.mq-panel .mq-primary {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  font-weight: 600;
+  padding: 12px;
+}
+
+.mq-panel .mq-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.mq-identity {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #94a3b80d;
+}
+
+.mq-identity code {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+
+.mq-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.mq-stats > div,
+.mq-replicas > div {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #94a3b833;
+  border-radius: 10px;
+  padding: 14px;
+  min-width: 0;
+}
+
+.mq-stats strong {
+  font-size: 19px;
+  overflow-wrap: anywhere;
+}
+
+.mq-console small {
+  opacity: .7;
+  font-size: 11px;
+}
+
+.mq-slotbar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  margin: 20px 0;
+}
+
+.mq-slot {
+  text-align: center;
+  padding: 14px 5px;
+  background: #94a3b81a;
+  border-radius: 6px;
+}
+
+.mq-slot-active {
+  background: #0d9488;
+  color: white;
+}
+
+.mq-replicas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mq-replicas > div {
+  text-align: center;
+}
+
+.mq-warning {
+  margin-top: 16px;
+  padding: 15px;
+  border: 1px solid #f59e0b77;
+  background: #f59e0b0d;
+  border-radius: 9px;
+}
+
+.mq-warning button {
+  margin: 4px;
+}
+
+.mq-status {
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mq-success {
+  color: #22c55e;
+  background: #22c55e18;
+}
+
+.mq-failed {
+  color: #ef4444;
+  background: #ef444418;
+}
+
+.mq-unknown {
+  color: #f59e0b;
+  background: #f59e0b18;
+}
+
+.mq-json {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 16px;
+  border-radius: 9px;
+  background: #0f172a;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.7;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.mq-empty {
+  text-align: center;
+  padding: 35px 15px;
+  opacity: .6;
+}
+
+.mq-table-wrap {
+  overflow-x: auto;
+}
+
+.mq-panel table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.mq-panel th,
+.mq-panel td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #94a3b822;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.mq-panel th {
+  opacity: .65;
+  font-weight: 500;
+}
+
+@media (max-width: 1000px) {
+  .mq-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .mq-panel {
+    padding: 14px;
+  }
+
+  .mq-stats {
+    grid-template-columns: 1fr;
+  }
+}

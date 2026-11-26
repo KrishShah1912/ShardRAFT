@@ -11,8 +11,14 @@
   "include": [
     "src/api/routing.ts",
     "src/api/client.ts",
+    "src/api/multiRaft.ts",
+    "src/api/multiDiagnostics.ts",
+    "src/multi/clusterState.ts",
     "src/validation/report.ts",
-    "src/validation/types.ts"
+    "src/validation/types.ts",
+    "src/api/multiGateway.ts",
+    "src/multi/keyRouting.ts",
+    "src/multi/pendingMutation.ts"
   ],
   "exclude": [
     "node_modules",

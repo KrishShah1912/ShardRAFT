@@ -3,6 +3,7 @@ package shard
 import (
 	"errors"
 	"fmt"
+	"github.com/KrishShah1912/shardraft/internal/observability"
 	"os"
 	"path/filepath"
 	"sort"
@@ -23,6 +24,7 @@ type GroupSendFunc func(
 ) error
 
 type ManagerConfig struct {
+	Events          *observability.Bus
 	NodeID          raft.NodeID
 	DataDir         string
 	ElectionTimeout int
@@ -100,6 +102,8 @@ func OpenManager(cfg ManagerConfig) (*Manager, error) {
 		}
 
 		instance, err := Open(Config{
+			Events:          cfg.Events,
+			ShardID:         uint64(placement.ID),
 			ID:              cfg.NodeID,
 			Peers:           peers,
 			ElectionTimeout: cfg.ElectionTimeout,

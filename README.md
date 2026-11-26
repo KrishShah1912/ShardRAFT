@@ -22,8 +22,8 @@ delegating consensus to an external Raft library. It combines persistent
 storage, replicated metadata, shard-aware routing, gRPC services,
 HTTP gateways, a command-line client, and an interactive React dashboard.
 
-**Project status:** Planned feature implementation complete.
-Final local build, static analysis, and race validation passed.
+**Project status:** All eleven planned backend milestones and the Multi-Raft frontend implementation are complete.
+Backend validation and focused frontend end-to-end testing passed.
 
 **Academic project:** CSE 512 — Distributed Database Systems,
 Arizona State University.
@@ -77,6 +77,10 @@ Arizona State University.
 | Measured replica recovery | 0.949 seconds |
 | WAL microbenchmark records | 30,000 |
 | Final local race-tested packages passed | 22/22 |
+| Multi-Raft dashboard pages | 15 |
+| Multi-Raft browser tests passed | 7/7 |
+| Browser-observed leader failover | 3.165 seconds |
+| Browser-observed replica recovery | 1.463 seconds |
 
 Performance figures represent measured local experiments,
 not guaranteed production performance.
@@ -136,7 +140,12 @@ not guaranteed production performance.
 - Independent named data volumes.
 - Storage-node health and status endpoints.
 - Non-root container runtime.
-- React and TypeScript development dashboard.
+- React and TypeScript dashboard with two deployment modes.
+- Live five-node Multi-Raft cluster monitoring.
+- Shard-aware database operations through both HTTP gateways.
+- Browser-based Docker node lifecycle controls.
+- Session-scoped unresolved mutation persistence.
+- Historical correctness and performance visualization.
 - Database explorer and query console.
 - Cluster status and replication visualization.
 - Controlled node failure and recovery experiments.
@@ -211,9 +220,12 @@ for routing client requests.
 
 ### Development Dashboard Architecture
 
-The existing dashboard uses the local development cluster
-and supervisor interfaces. This is distinct from the standalone
-multi-Raft Docker gateway deployment.
+The dashboard supports both the original three-node development
+cluster and the physical five-node Multi-Raft Docker deployment.
+
+Development mode uses the existing Go supervisor and daemon APIs.
+Multi-Raft mode uses the Docker storage diagnostics APIs,
+standalone HTTP gateways, and a local Docker control service.
 
 ```mermaid
 flowchart LR
@@ -238,6 +250,35 @@ flowchart LR
 
 The single-shard development mode remains available alongside
 the physical multi-Raft deployment.
+
+### Multi-Raft Dashboard Architecture
+
+```mermaid
+flowchart LR
+    UI[React Multi-Raft Dashboard]
+    VP[Vite Local Proxy]
+    DC[Docker Control Service]
+    G1[Gateway 1]
+    G2[Gateway 2]
+    N[Five Storage Nodes]
+    M[Replicated Metadata]
+    R[Historical Experiment Report]
+
+    UI --> VP
+    VP --> G1
+    VP --> G2
+    VP --> N
+    VP --> DC
+    DC --> N
+    G1 --> N
+    G2 --> N
+    N --> M
+    UI --> R
+```
+
+The dashboard displays live observations from the running deployment.
+Performance and correctness experiment summaries are explicitly
+identified as historical evidence.
 
 ---
 
@@ -283,6 +324,7 @@ ShardRAFT/
 │   ├── checker/                # Porcupine correctness checker
 │   ├── shardraft/              # gRPC command-line client
 │   ├── shardraft-bench/        # Original benchmark CLI
+│   ├── shardraft-docker-control/ # Local Docker lifecycle API
 │   ├── shardraft-gateway/      # Standalone HTTP-gRPC gateway
 │   ├── shardraft-supervisor/   # Development cluster supervisor
 │   ├── shardraftd/             # Storage daemon and RPC services
@@ -348,6 +390,7 @@ are not part of the tracked source tree.
 | shardraft | Executes distributed KV operations through gRPC |
 | shardraft-gateway | Exposes the shard-aware client through HTTP |
 | shardraft-supervisor | Manages and observes the development cluster |
+| shardraft-docker-control | Provides local Docker lifecycle controls |
 | shardraft-bench | Original node-oriented benchmark utility |
 | bench | Generates configurable distributed workloads |
 | checker | Evaluates recorded single-key operation histories |
@@ -900,21 +943,125 @@ See [gRPC CLI Documentation](docs/GRPC_CLI.md).
 
 ## Web Dashboard
 
-ShardRAFT includes an interactive React and TypeScript
-dashboard for the local development environment.
+ShardRAFT includes an interactive React and TypeScript dashboard
+supporting both development and physical Multi-Raft deployments.
 
-The dashboard provides interfaces for:
+### Deployment Modes
 
-- Database exploration.
-- Key-value operations.
-- Query execution.
-- Cluster monitoring.
-- Node roles and Raft terms.
-- Commit and replication progress.
-- Controlled node failure experiments.
-- Benchmark and validation reporting.
+| Mode | URL | Backend |
+|---|---|---|
+| Development | http://127.0.0.1:5173/ | Three-node local development cluster |
+| Multi-Raft | http://127.0.0.1:5173/?mode=multi | Five storage nodes and two Docker gateways |
 
-### Start the Development Dashboard
+The sidebar provides navigation between the two modes.
+Each mode requires its corresponding backend services.
+
+### Start the Multi-Raft Dashboard
+
+From the repository root, start the Docker deployment:
+
+```bash
+docker compose up -d --build --wait
+docker compose ps
+```
+
+In a second terminal, start the local Docker control service:
+
+```bash
+go run ./cmd/shardraft-docker-control
+```
+
+In a third terminal, start the frontend:
+
+```bash
+cd web
+npm ci
+npm run dev
+```
+
+Open:
+
+http://127.0.0.1:5173/?mode=multi
+
+The Docker control service listens on 127.0.0.1:18090.
+It is required for browser-based node lifecycle operations.
+
+The Vite development proxy connects the frontend to the local
+storage nodes, gateways, and Docker control service.
+
+### Dashboard Capabilities
+
+| Page | Functionality | Evidence |
+|---|---|---|
+| Overview | Cluster reachability, shard leadership and availability | Live |
+| Architecture | Physical topology and request-routing architecture | Configuration and live observations |
+| Cluster | Storage nodes, group membership and replica status | Live |
+| Replication | Per-shard leader, term, commit and applied indexes | Live |
+| Raft Log | Per-replica replicated log inspection | Live local diagnostics |
+| Database | Per-replica key-value exploration | Live local diagnostics |
+| Query Console | GET, PUT, DELETE, CAS and gateway retries | Live |
+| Storage | WAL, Pebble and snapshot diagnostics | Live local diagnostics |
+| Transport | Per-peer gRPC transport statistics | Live |
+| Shards | Slot ownership, metadata and key-routing preview | Live and computed |
+| Metrics | Cluster observations and replication progress | Live sampled observations |
+| Events | Shard-tagged event history and filtering | Live bounded polling |
+| Test Lab | Recorded correctness and validation evidence | Historical |
+| Fault Lab | Docker stop, start, restart and leadership transitions | Live |
+| Performance Lab | Throughput, latency, fault and WAL measurements | Historical |
+
+### Query Console
+
+The Multi-Raft Query Console supports:
+
+- GET, PUT, DELETE, and compare-and-swap operations.
+- Both standalone HTTP gateways.
+- Linearizable reads by default and explicit local reads.
+- Automatic gateway failover.
+- Stable mutation identities across retries.
+- Session storage persistence for unresolved mutations.
+- Exact-payload retry after a page reload.
+- Request history and structured response inspection.
+- CRC32 slot calculation and shard-routing previews.
+
+Routing previews are computed from the observed shard map.
+They are not distributed request traces.
+
+Unresolved mutations survive supported same-tab reloads when
+session storage is available. Query history is held in memory.
+
+### Fault Injection Lab
+
+The Fault Lab controls the local Docker storage containers.
+
+It displays observed leadership changes, replica reachability,
+shard availability, and Docker action history.
+
+A confirmed Docker action does not itself establish Raft
+recovery. Replica commit and applied indexes should also
+be inspected.
+
+Use the controls only with the local demonstration cluster.
+Restore stopped nodes before beginning another experiment.
+
+### Historical Evaluation Evidence
+
+The Performance Lab and Test Lab load:
+
+[Multi-Raft experiment report](web/public/generated/multi-raft-experiments.json)
+
+The report contains recorded results from:
+
+- Eight distributed workload experiments.
+- 8,000 successful operations.
+- Eight linearizable recorded histories.
+- Leader failover and replica recovery measurements.
+- Three isolated WAL synchronization policies.
+
+These pages visualize existing experiment results.
+They do not launch new distributed benchmarks or correctness
+checker executions.
+
+### Start the Original Development Dashboard
 
 From the repository root:
 
@@ -922,16 +1069,13 @@ From the repository root:
 cd web
 npm ci
 cd ..
-
 make dev
 ```
 
-Open:
+Open http://127.0.0.1:5173/.
 
-http://localhost:5173
-
-The development supervisor and local cluster scripts
-support the existing dashboard workflow.
+The original development supervisor and three-node dashboard
+remain available.
 
 ### Frontend Validation
 
@@ -941,16 +1085,84 @@ npm test
 npm run build
 ```
 
-Browser end-to-end testing is available through
-Playwright:
+Original development browser tests:
 
 ```bash
-npx playwright install
+npx playwright install chromium
 npm run test:e2e
 ```
 
-The dashboard development workflow is separate from
-the seven-service multi-Raft Docker deployment.
+Multi-Raft browser tests require the Docker deployment and
+local Docker control service to be running.
+
+Discover the tests without executing them:
+
+```bash
+npx playwright test --config=playwright.multi.config.ts --list
+```
+
+Run the dashboard smoke tests:
+
+```bash
+npx playwright test --config=playwright.multi.config.ts multi-smoke.spec.ts
+```
+
+Run live KV and retry tests:
+
+```bash
+npx playwright test --config=playwright.multi.config.ts multi-kv.spec.ts multi-retry.spec.ts
+```
+
+The live failover test deliberately stops Node 2 and requires
+Node 2 to initially lead Shard 2 without leading the metadata
+group. Verify these preconditions before running it.
+
+```bash
+npx playwright test --config=playwright.multi.config.ts multi-failover.spec.ts
+```
+
+### Multi-Raft Browser Validation Results
+
+| Test | Result |
+|---|---|
+| Five storage nodes and metadata availability | Passed |
+| All fifteen dashboard pages render | Passed |
+| Historical experiment evidence loads | Passed |
+| Live KV lifecycle through both gateways | Passed |
+| Automatic gateway failover preserves mutation identity | Passed |
+| Unresolved mutation survives reload and deduplicated retry | Passed |
+| Live leader failover and replica recovery | Passed |
+
+The seven tests passed across focused browser test runs.
+
+The gateway failover test injects a browser-level network
+failure. The storage failover test performs a real graceful
+Docker container stop and subsequent start.
+
+### Browser-Observed Leader Failover
+
+| Measurement | Observed result |
+|---|---|
+| Target shard | Shard 2 |
+| Original leader | Node 2 |
+| Replacement leader | Node 3 |
+| Original term | 4 |
+| New term | 5 |
+| Stop-to-election observation | 3165 ms |
+| Replica recovery observation | 1463 ms |
+| Recovery target commit index | 945 |
+| Recovered commit index | 945 |
+| Recovered applied index | 945 |
+| Committed value preservation | Passed |
+| Reads and writes after leader replacement | Passed |
+| Final storage-node health | 5/5 healthy |
+
+These measurements include browser, Docker control, and polling
+overhead. They are separate from the earlier backend fault
+measurements in the Performance Evaluation section.
+
+See [Multi-Raft Frontend and Demonstration Guide](docs/MULTI_RAFT_FRONTEND.md)
+for startup, demonstration, recovery, and troubleshooting instructions.
 
 ---
 
@@ -1266,6 +1478,9 @@ Generated artifacts are stored under results/.
 Raw results are generated automatically and are
 excluded from version control.
 
+A compact historical experiment summary is included in
+the frontend public assets for demonstration purposes.
+
 See [Correctness and Performance Evaluation](docs/PERFORMANCE.md)
 for detailed results, reproduction commands, and limitations.
 
@@ -1344,6 +1559,10 @@ The implemented test suites cover:
 | Docker multi-shard integration | Passed |
 | Docker leader failover | Passed |
 | Docker follower recovery | Passed |
+| Multi-Raft dashboard smoke tests | 3/3 passed |
+| Live browser KV lifecycle | Passed |
+| Browser mutation retry and reload | 2/2 passed |
+| Browser leader failover and recovery | Passed |
 
 The final local race suite reused successful cached
 test results where applicable.
@@ -1425,6 +1644,7 @@ verification entries.
 | [gRPC Acceptance](docs/GRPC_ACCEPTANCE.md) | Cross-component integration acceptance |
 | [Multi-Raft Acceptance](docs/MULTI_RAFT_ACCEPTANCE.md) | Physical multi-shard validation |
 | [Docker Deployment](docs/DEPLOYMENT.md) | Five-node, two-gateway deployment |
+| [Multi-Raft Frontend](docs/MULTI_RAFT_FRONTEND.md) | Dashboard startup, demonstration and browser validation |
 | [Performance Evaluation](docs/PERFORMANCE.md) | Correctness and measured performance |
 | [Development Checklist](docs/CHECKLIST.md) | Implementation and acceptance tracking |
 
@@ -1452,7 +1672,15 @@ The following limitations remain:
 - Production authentication, authorization, and network security hardening are outside the current scope.
 - Storage health checks verify daemon responsiveness rather than quorum availability.
 - Gateways do not expose dedicated health endpoints.
-- Dashboard unresolved mutation state is not guaranteed to survive page reloads.
+- Multi-Raft unresolved mutation state uses session storage and supports same-tab reloads, not guaranteed persistence after closing a tab.
+- Query history and observed telemetry history are held in memory.
+- Local diagnostic reads may be stale and separate observations are not atomic.
+- Reachability-based majority indicators do not prove consensus availability.
+- Event polling is bounded and is not a lossless event stream.
+- Routing previews are not actual distributed request traces.
+- Multi-Raft Performance Lab and Test Lab display historical evidence rather than executing live benchmarks.
+- Browser gateway failure injection does not establish actual gateway process recovery.
+- The Docker control service is intended only for trusted local demonstrations.
 - Docker fault measurements use graceful container stops and restarts.
 - The Docker fault tests do not establish power-loss durability.
 - Replica recovery measurements include catch-up and polling overhead.

@@ -7,6 +7,7 @@ import (
 )
 
 type Event struct {
+	ShardID   uint64         `json:"shard_id,omitempty"`
 	ID        uint64         `json:"id"`
 	Timestamp time.Time      `json:"timestamp"`
 	NodeID    raft.NodeID    `json:"node_id"`

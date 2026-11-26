@@ -15,6 +15,7 @@ import (
 var ErrClosed = errors.New("shard is closed")
 
 type Config struct {
+	ShardID         uint64
 	ID              raft.NodeID
 	Peers           []raft.NodeID
 	ElectionTimeout int
@@ -89,6 +90,7 @@ func Open(cfg Config) (*Shard, error) {
 			status := node.Status()
 
 			cfg.Events.Publish(observability.Event{
+				ShardID:  cfg.ShardID,
 				NodeID:   status.ID,
 				Category: observability.CategoryRaft,
 				Type:     event.Type,

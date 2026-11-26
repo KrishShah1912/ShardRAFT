@@ -1,0 +1,152 @@
+.mx-page {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.mx-page .page-header {
+  margin-bottom: 0;
+}
+
+.mx-flow {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 20px 0;
+}
+
+.mx-box {
+  display: grid;
+  gap: 8px;
+  text-align: center;
+  padding: 16px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--panel-hover);
+  min-width: 0;
+}
+
+.mx-box strong {
+  font-size: 14px;
+}
+
+.mx-box span,
+.mx-box small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.mx-client,
+.mx-metadata {
+  width: min(100%, 460px);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mx-arrow {
+  color: var(--accent);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.mx-gateways {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  width: min(100%, 620px);
+}
+
+.mx-shards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.mx-nodes {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.mx-node {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--panel-hover);
+  min-width: 0;
+}
+
+.mx-node > strong {
+  font-size: 15px;
+}
+
+.mx-node small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.mx-replica {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 10px;
+  background: var(--panel);
+}
+
+.mx-replica strong {
+  font-size: 12px;
+}
+
+.mx-meta {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+
+.mx-disk {
+  margin-top: auto;
+  padding: 10px 5px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.mx-slotbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 20px 0;
+}
+
+.mx-slotbar > div {
+  display: grid;
+  gap: 8px;
+  padding: 16px 8px;
+  border: 1px solid;
+  border-radius: 7px;
+  text-align: center;
+}
+
+.mx-slotbar span,
+.mx-slotbar small {
+  font-size: 11px;
+}
+
+.mx-json {
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 12px;
+  line-height: 1.6;
+}
