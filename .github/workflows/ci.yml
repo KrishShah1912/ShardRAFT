@@ -1,0 +1,55 @@
+name: ShardRAFT CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Go validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      CGO_ENABLED: "1"
+      SHARDRAFT_DOCKER_TEST: "0"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify Go version
+        run: go version
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Build repository
+        run: go build ./...
+
+      - name: Run static analysis
+        run: go vet ./...
+
+      - name: Run complete race tests
+        run: go test -race ./...
