@@ -177,3 +177,24 @@ go test -race -count=1 ./internal/meta ./internal/shard
 - The production daemon still runs a single Raft group owning all
   65,536 slots; wiring multiple physical groups through the dispatcher
   is a later step.
+
+## Step 8 Implementation Status
+
+The physical multi-Raft implementation is now integrated
+into the storage daemon.
+
+The initial four-shard topology is operational across
+five storage nodes, with an independent metadata Raft
+group hosted by nodes 1, 2 and 3.
+
+The production client discovers the committed shard map
+and routes KV operations to the appropriate data group.
+
+The initial topology is fixed. Live migration and
+rebalancing remain outside the implemented scope.
+
+Earlier implementation-status descriptions in this
+document describe the preceding in-process milestone.
+
+See [Multi-Raft Acceptance](MULTI_RAFT_ACCEPTANCE.md)
+for current validation results and limitations.

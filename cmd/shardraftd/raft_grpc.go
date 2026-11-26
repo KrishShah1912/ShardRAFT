@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/KrishShah1912/shardraft/internal/meta"
 	"github.com/KrishShah1912/shardraft/internal/raft"
 	"github.com/KrishShah1912/shardraft/internal/shard"
 	"github.com/KrishShah1912/shardraft/internal/transport"
@@ -117,7 +118,9 @@ func (s *raftGRPCServer) Step(
 
 	if err := s.node.Step(message); err != nil {
 		if errors.Is(err, shard.ErrClosed) ||
-			errors.Is(err, shard.ErrStopped) {
+			errors.Is(err, shard.ErrStopped) ||
+			errors.Is(err, meta.ErrGroupClosed) ||
+			errors.Is(err, meta.ErrGroupStopped) {
 			return nil, status.Error(
 				codes.Unavailable,
 				"node unavailable",

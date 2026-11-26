@@ -310,3 +310,22 @@ model, request flow and limitations.
 The production daemon still runs a single Raft group owning all
 65,536 slots. Multiple physical Raft groups and shard rebalancing
 remain future work.
+
+## Step 8 Acceptance: Multi-Raft Sharding and Metadata
+
+- [x] Inspect existing sharding implementation.
+- [x] Implement physical multi-Raft group management.
+- [x] Validate group replication and recovery.
+- [x] Integrate data groups into the storage daemon.
+- [x] Implement persistent metadata Raft group.
+- [x] Implement automatic metadata bootstrap.
+- [x] Expose committed shard-map discovery.
+- [x] Implement shard-aware KV request dispatch.
+- [x] Validate deterministic routing for 10,000 keys.
+- [x] Validate incorrect routing rejection.
+- [x] Validate end-to-end operations across four shards.
+- [x] Document implementation and limitations.
+- [x] Complete final repository validation.
+- [ ] Merge multi-Raft implementation pull request.
+
+See [Multi-Raft Acceptance](MULTI_RAFT_ACCEPTANCE.md).

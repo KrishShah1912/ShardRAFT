@@ -22,6 +22,7 @@ import (
 )
 
 type config struct {
+	multiRaft       bool
 	id              uint64
 	peers           string
 	peerAddrs       string
@@ -63,6 +64,10 @@ func parsePeers(value string) ([]raft.NodeID, error) {
 }
 
 func run(ctx context.Context, cfg config) error {
+	if cfg.multiRaft {
+		return runMultiRaft(ctx, cfg)
+	}
+
 	if cfg.id == 0 {
 		return errors.New("node ID must be nonzero")
 	}
@@ -400,6 +405,13 @@ func main() {
 		"grpc-peer-addrs",
 		"",
 		"gRPC peer addresses: 2=127.0.0.1:9092,3=127.0.0.1:9093",
+	)
+
+	flag.BoolVar(
+		&cfg.multiRaft,
+		"multi-raft",
+		false,
+		"enable physical multi-Raft data groups",
 	)
 
 	flag.Parse()
