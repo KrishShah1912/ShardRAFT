@@ -43,7 +43,7 @@ and deterministic randomized fault workloads.
 
 **Important:** ShardRAFT implements real networking, HTTP and gRPC APIs,
 a React dashboard, metadata discovery, and shard-aware client routing.
-Physical sharding remains future work. The current tests do not constitute
+Physical sharding is implemented through the optional multi-Raft deployment mode. The current tests do not constitute
 a proof of correctness under all possible failures.
 
 ---
@@ -1650,3 +1650,22 @@ See [gRPC Integration Acceptance](docs/GRPC_ACCEPTANCE.md)
 for the final results, acceptance scope and limitations.
 
 Physical multi-shard execution remains part of Step 8.
+
+## Multi-Raft Sharding and Metadata
+
+ShardRAFT supports five storage nodes, four independent
+data-shard Raft groups and one replicated metadata group.
+
+- 65,536 deterministic hash slots.
+- Three replicas per data shard.
+- Persistent, versioned metadata.
+- Automatic shard-map discovery.
+- Shard-aware KV request routing.
+- Linearizable reads and mutation deduplication.
+- Successful end-to-end validation across all four shards.
+
+Multi-Raft mode is enabled with the `-multi-raft` flag.
+The existing single-shard mode remains available.
+
+See [Multi-Raft Acceptance](docs/MULTI_RAFT_ACCEPTANCE.md)
+for implementation details, validation results and limitations.
