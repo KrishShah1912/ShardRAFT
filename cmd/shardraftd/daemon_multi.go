@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/KrishShah1912/shardraft/internal/observability"
 	"log"
 	"net"
 	"net/http"
@@ -319,8 +320,12 @@ func runMultiRaft(
 		)
 	}()
 
+	events := observability.NewBus(observability.DefaultHistorySize)
+	connectMultiTransportEvents(sender, events, nodeID)
+
 	manager, err := shard.OpenManager(
 		shard.ManagerConfig{
+			Events:          events,
 			NodeID:          nodeID,
 			DataDir:         cfg.dataDir,
 			ElectionTimeout: cfg.electionTimeout,
@@ -397,6 +402,36 @@ func runMultiRaft(
 				nodeID,
 			),
 		)
+
+		discoveryAddresses[nodeID] = metaGRPCLocalAddress(
+			cfg.grpcAddr,
+			grpcServer.listener.Addr(),
+		)
+
+		registerMultiMetadataHTTP(
+			mux,
+			metadata.Group(),
+			newMultiMetaGRPCServer(
+				manager,
+				metadata.Group(),
+				discoveryAddresses,
+			),
+			nodeID,
+		)
+
+		registerMultiRaftAdminHTTP(
+			mux,
+			manager,
+			nodeID,
+		)
+
+		registerMultiTransportHTTP(
+			mux,
+			sender,
+			nodeID,
+		)
+
+		registerEventHandlers(mux, events)
 
 		server := &http.Server{
 			Handler:           mux,

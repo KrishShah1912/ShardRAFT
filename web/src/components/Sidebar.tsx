@@ -21,6 +21,9 @@ import type { Page } from "../types";
 interface Props {
   page: Page;
   onChange: (page: Page) => void;
+  mode?: "legacy" | "multi";
+  reachableNodes?: number;
+  loading?: boolean;
 }
 
 const groups: {
@@ -145,6 +148,9 @@ const groups: {
 export function Sidebar({
   page,
   onChange,
+  mode = "legacy",
+  reachableNodes = 0,
+  loading = false,
 }: Props) {
   return (
     <aside className="sidebar">
@@ -198,13 +204,50 @@ export function Sidebar({
       </nav>
 
       <div className="sidebar-footer">
-        <div className="status-dot healthy" />
+        <div
+          className={
+            mode === "legacy" ||
+            (!loading && reachableNodes === 5)
+              ? "status-dot healthy"
+              : "status-dot ma-status-warning"
+          }
+        />
 
         <div>
-          <strong>Local Cluster</strong>
-          <span>3-node development</span>
+          <strong>
+            {mode === "multi"
+              ? "Multi-Raft Cluster"
+              : "Local Cluster"}
+          </strong>
+          <span>
+            {mode === "multi"
+              ? loading
+                ? "Connecting..."
+                : `${reachableNodes}/5 nodes reachable`
+              : "3-node development"}
+          </span>
         </div>
       </div>
+      <a
+        className="ma-mode-link"
+        href={mode === "multi" ? "/" : "/?mode=multi"}
+        onClick={event => {
+          if (
+            mode === "multi" &&
+            !window.confirm(
+              "Switch deployment mode? In-memory query history " +
+              "will be lost. Saved unresolved mutations " +
+              "remain available in this browser tab.",
+            )
+          ) {
+            event.preventDefault();
+          }
+        }}
+      >
+        {mode === "multi"
+          ? "Switch to development mode"
+          : "Switch to Multi-Raft mode"}
+      </a>
     </aside>
   );
 }

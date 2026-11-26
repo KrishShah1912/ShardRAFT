@@ -42,3 +42,5 @@ web/public/generated/validation-report.json
 # Python cache
 __pycache__/
 *.pyc
+/web/playwright-multi-report/
+/web/test-results-multi/

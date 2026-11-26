@@ -1,6 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+const proxyTo = (prefix: string, port: number) => ({
+  target: `http://127.0.0.1:${port}`,
+  changeOrigin: true,
+  rewrite: (path: string) =>
+    path.slice(prefix.length) || "/",
+});
+
 export default defineConfig({
   plugins: [react()],
 
@@ -9,34 +16,28 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
 
+    watch: {
+      ignored: [
+        "**/playwright-multi-report/**",
+        "**/test-results-multi/**",
+      ],
+    },
+
     proxy: {
-      "/node1": {
-        target: "http://127.0.0.1:8081",
-        changeOrigin: true,
-        rewrite: (path) =>
-          path.replace(/^\/node1/, ""),
-      },
+      "/multi/control": proxyTo("/multi/control", 18090),
+      "/node1": proxyTo("/node1", 8081),
+      "/node2": proxyTo("/node2", 8082),
+      "/node3": proxyTo("/node3", 8083),
+      "/control": proxyTo("/control", 8090),
 
-      "/node2": {
-        target: "http://127.0.0.1:8082",
-        changeOrigin: true,
-        rewrite: (path) =>
-          path.replace(/^\/node2/, ""),
-      },
+      "/multi/node1": proxyTo("/multi/node1", 18081),
+      "/multi/node2": proxyTo("/multi/node2", 18082),
+      "/multi/node3": proxyTo("/multi/node3", 18083),
+      "/multi/node4": proxyTo("/multi/node4", 18084),
+      "/multi/node5": proxyTo("/multi/node5", 18085),
 
-      "/node3": {
-        target: "http://127.0.0.1:8083",
-        changeOrigin: true,
-        rewrite: (path) =>
-          path.replace(/^\/node3/, ""),
-      },
-
-      "/control": {
-        target: "http://127.0.0.1:8090",
-        changeOrigin: true,
-        rewrite: (path) =>
-          path.replace(/^\/control/, ""),
-      },
+      "/multi/gateway1": proxyTo("/multi/gateway1", 18091),
+      "/multi/gateway2": proxyTo("/multi/gateway2", 18092),
     },
   },
 });
