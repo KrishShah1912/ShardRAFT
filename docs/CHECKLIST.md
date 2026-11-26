@@ -250,6 +250,29 @@ The CLI is validated against a three-replica, single-shard
 deployment. Physical multi-shard deployment remains future work.
 
 
+## Step 7.23 - Final Cross-Component Integration
+
+- [x] Verify CLI and gateway interoperability.
+- [x] Verify cross-interface mutation deduplication.
+- [x] Verify conflicting mutation identity rejection.
+- [x] Verify legacy daemon HTTP GET compatibility.
+- [x] Verify exact committed-entry progression.
+- [x] Verify integration process cleanup.
+
+## Step 7.24 - Final Acceptance
+
+- [x] Review previously completed component validation.
+- [x] Complete focused cross-component validation.
+- [x] Document acceptance scope and limitations.
+- [x] Preserve existing production interfaces.
+- [x] Document outstanding physical sharding work.
+
+## Step 7.25 - Final Closure
+
+- [x] Create final gRPC acceptance report.
+- [x] Update README and implementation checklist.
+- [ ] Merge final integration pull request.
+
 ## Step 8 - Sharding and the Metadata Group
 
 - [x] Implement deterministic CRC32 slot calculation.

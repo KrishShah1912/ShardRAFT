@@ -1636,3 +1636,17 @@ Physical multi-shard deployment remains future work.
 
 See [ShardRAFT gRPC CLI](docs/GRPC_CLI.md) for configuration,
 command examples, exit codes, mutation recovery, and limitations.
+
+## Final gRPC Integration Acceptance
+
+The gRPC CLI, HTTP gateway and legacy daemon HTTP GET
+interface have been validated against the same isolated
+three-node cluster.
+
+Cross-interface mutation replay and identity conflict
+handling passed without additional committed entries.
+
+See [gRPC Integration Acceptance](docs/GRPC_ACCEPTANCE.md)
+for the final results, acceptance scope and limitations.
+
+Physical multi-shard execution remains part of Step 8.
