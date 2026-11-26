@@ -135,6 +135,73 @@ details, validation results, and remaining limitations.
 Physical sharding and multiple Raft groups remain future work.
 
 
+## Step 7.21 - HTTP-gRPC Gateway
+
+- [x] 7.21.1 Synchronize and validate the baseline.
+- [x] 7.21.2 Inspect gateway architecture and API contracts.
+- [x] 7.21.3 Implement gateway configuration and client interface.
+- [x] 7.21.4 Implement the HTTP GET handler.
+- [x] 7.21.5 Implement the HTTP PUT handler.
+- [x] 7.21.6 Implement the HTTP DELETE handler.
+- [x] 7.21.7 Implement the HTTP CAS handler.
+- [x] 7.21.8 Implement structured HTTP error translation.
+- [x] 7.21.9 Implement server lifecycle and graceful shutdown.
+- [x] 7.21.10 Complete gateway unit and lifecycle tests.
+- [x] 7.21.11 Complete distributed integration testing.
+- [ ] 7.21.12 Complete final documentation and merge.
+
+### Distributed Integration Validation
+
+- [x] Inspect distributed testing infrastructure.
+- [x] Validate bootstrap discovery and CRUD.
+- [x] Validate leader failover and durable deduplication.
+- [x] Validate request identity conflicts.
+- [x] Implement committed conflict confirmation.
+- [x] Validate quorum loss and recovery.
+- [x] Validate concurrent distinct mutations.
+- [x] Validate concurrent identical mutations.
+- [x] Validate concurrent conflicting identities.
+- [x] Validate concurrent CAS contention.
+- [x] Validate concurrent DELETE operations.
+- [x] Validate replica convergence.
+- [x] Validate complete backend unavailability.
+- [x] Validate gateway restart and data persistence.
+- [x] Validate durable deduplication after gateway restart.
+- [x] Complete distributed stress and race regression.
+
+### Finalization
+
+- [x] 7.21.12.1 Inspect documentation and final changes.
+- [x] 7.21.12.2 Create dedicated gateway documentation.
+- [x] 7.21.12.3 Update README and implementation checklist.
+- [x] 7.21.12.4 Complete final pre-commit validation.
+- [ ] 7.21.12.5 Commit, push, and merge the pull request.
+
+### Validation Summary
+
+- 78 gateway test functions.
+- 59 gateway unit test functions.
+- 19 distributed integration test functions.
+- 190 distributed test executions passed.
+- 95.5% gateway unit statement coverage.
+- 92.5% gRPC client statement coverage.
+- 100% statement coverage for all four KV handlers.
+- No race warnings reported in the final regression.
+- Complete backend normal and race regression passed.
+- Build, static analysis, and module verification passed.
+- Existing Go module dependencies preserved.
+- Additive committed-conflict protobuf extension validated.
+
+See [HTTP_GRPC_GATEWAY.md](HTTP_GRPC_GATEWAY.md)
+for architecture, API behavior, validation results,
+and remaining limitations.
+
+The gateway is validated against a real three-replica,
+single-shard deployment. Physical multi-shard deployment
+and exhaustive crash recovery verification remain
+future work.
+
+
 ## Step 8 - Sharding and the Metadata Group
 
 - [x] Implement deterministic CRC32 slot calculation.

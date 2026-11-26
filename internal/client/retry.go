@@ -306,6 +306,19 @@ func (executor *RetryExecutor) Execute(
 			return nil
 		}
 
+		// A confirmed conflict against an applied command
+		// resolves uncertainty from earlier mutation attempts.
+		// Pending conflicts and transport errors do not.
+		if mutation &&
+			rpcError == nil &&
+			routingError.GetCode() ==
+				shardraftpb.ErrorCode_ERROR_CODE_REQUEST_CONFLICT &&
+			routingError.GetConflictCommitted() {
+			return &RoutingFailure{
+				Detail: routingError,
+			}
+		}
+
 		decision := ClassifyRetry(
 			routingError,
 			rpcError,
