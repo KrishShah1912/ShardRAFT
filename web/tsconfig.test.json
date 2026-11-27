@@ -18,7 +18,12 @@
     "src/validation/types.ts",
     "src/api/multiGateway.ts",
     "src/multi/keyRouting.ts",
-    "src/multi/pendingMutation.ts"
+    "src/multi/pendingMutation.ts",
+    "src/multi/liveTelemetry.ts",
+    "src/multi/liveEventStream.ts",
+    "src/multi/useMultiLiveTelemetry.ts",
+    "src/multi/electionTelemetry.ts",
+    "src/multi/replicationTelemetry.ts"
   ],
   "exclude": [
     "node_modules",

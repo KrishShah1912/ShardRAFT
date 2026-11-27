@@ -1,0 +1,193 @@
+.mac-consensus {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.mac-heading {
+  display: grid;
+  gap: 20px;
+}
+
+.mac-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.mac-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  color: #60a5fa;
+  border: 1px solid #315477;
+  border-radius: 12px;
+  background: #15283e;
+  box-shadow: 0 0 24px #60a5fa12;
+}
+
+.mac-eyebrow {
+  color: #60a5fa;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.mac-title h2 {
+  margin: 5px 0;
+}
+
+.mac-title p {
+  margin: 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.mac-streams {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 8px 12px;
+  color: #94a3b8;
+  background: #111c2b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.mac-shards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mac-shard {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  min-width: 0;
+  text-align: left;
+  color: #e2e8f0;
+  background: linear-gradient(
+    145deg,
+    #142133,
+    #0d1623
+  );
+  border: 1px solid #29394e;
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+
+.mac-shard:hover {
+  transform: translateY(-3px);
+  border-color: #64748b;
+}
+
+.mac-shard:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 3px;
+}
+
+.mac-shard-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mac-shard-top i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: auto;
+}
+
+.mac-shard-details {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mac-shard-details span {
+  display: grid;
+  gap: 6px;
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.mac-shard-details b {
+  font-size: 15px;
+  color: #e2e8f0;
+}
+
+.mac-shard-progress {
+  height: 5px;
+  background: #253449;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.mac-shard-progress > div {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 600ms ease;
+}
+
+.mac-shard small {
+  color: #94a3b8;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+@media (max-width: 1100px) {
+  .mac-shards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 550px) {
+  .mac-shards {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mac-shard,
+  .mac-shard-progress > div {
+    transition: none;
+  }
+
+  .mac-shard:hover {
+    transform: none;
+  }
+}
+
+/* Live demonstration synchronization */
+.mac-demo-lock {
+  padding: 10px 14px;
+  border: 1px solid #2dd4bf44;
+  border-radius: 8px;
+  background: #2dd4bf0c;
+  color: #2dd4bf;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mac-shard:disabled {
+  cursor: not-allowed;
+}
+
+.mac-shard:disabled:not(.active) {
+  opacity: .55;
+}
+
+.mac-shard.active:disabled {
+  opacity: 1;
+}

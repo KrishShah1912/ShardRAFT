@@ -1,0 +1,285 @@
+.mei-panel {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  border-color: #3b82f666 !important;
+}
+
+.mei-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mei-header h2,
+.mei-header h3 {
+  margin: 0;
+}
+
+.mei-eyebrow {
+  color: #60a5fa;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.6px;
+  margin-bottom: 8px;
+}
+
+.mei-event-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mei-event-title strong {
+  font-size: 17px;
+}
+
+.mei-event-title code {
+  color: #60a5fa;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.mei-timestamp {
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.mei-fields {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mei-fields > div {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+}
+
+.mei-fields span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.mei-fields strong {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.mei-section {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border-light);
+  border-radius: 9px;
+  min-width: 0;
+}
+
+.mei-section h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.mei-section p {
+  font-size: 12px;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.mei-participants {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 15px;
+}
+
+.mei-node {
+  display: grid;
+  gap: 8px;
+  min-width: 100px;
+  text-align: center;
+  padding: 16px;
+  border: 1px solid #60a5fa66;
+  border-radius: 9px;
+  background: #3b82f610;
+}
+
+.mei-node strong {
+  font-size: 24px;
+  color: #60a5fa;
+}
+
+.mei-direction {
+  display: grid;
+  gap: 8px;
+  text-align: center;
+  color: #60a5fa;
+  font-size: 12px;
+}
+
+.mei-timeline {
+  display: grid;
+  gap: 7px;
+  max-height: 450px;
+  overflow: auto;
+}
+
+.mei-timeline-item {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  background: var(--bg);
+}
+
+.mei-timeline-item > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mei-timeline-item strong {
+  font-size: 12px;
+}
+
+.mei-timeline-item code,
+.mei-timeline-item time {
+  font-size: 10px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.mei-timeline-item.mei-selected {
+  border-color: #60a5fa;
+  background: #3b82f610;
+}
+
+.mei-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #60a5fa;
+  flex-shrink: 0;
+}
+
+.mei-timeline-item .mei-dot {
+  margin-top: 4px;
+}
+
+.mei-success {
+  background: #34d399;
+}
+
+.mei-danger {
+  background: #f87171;
+}
+
+.mei-warning {
+  background: #fbbf24;
+}
+
+.mei-received {
+  background: #a78bfa;
+}
+
+.mei-primary {
+  background: #60a5fa;
+}
+
+.mei-payload {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.mei-payload > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 14px;
+  padding: 11px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.mei-payload code {
+  color: #94a3b8;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mei-payload strong {
+  font-size: 12px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.mei-json {
+  margin: 0;
+  padding: 16px;
+  max-height: 400px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  user-select: text;
+}
+
+.mei-note {
+  font-size: 11px !important;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.mt-page button.mei-inspect-button {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: #60a5fa;
+  border-color: #3b82f655;
+  background: #3b82f610;
+}
+
+.mt-page button.mei-inspect-button:hover {
+  border-color: #60a5fa;
+}
+
+@media (max-width: 1200px) {
+  .mei-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 650px) {
+  .mei-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mei-participants {
+    gap: 10px;
+  }
+
+  .mei-timeline-item {
+    grid-template-columns: 12px minmax(0, 1fr);
+  }
+
+  .mei-timeline-item time {
+    grid-column: 2;
+  }
+}

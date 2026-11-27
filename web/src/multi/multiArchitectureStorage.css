@@ -1,0 +1,383 @@
+.mas-panel {
+  min-width: 0;
+}
+
+.mas-header,
+.mas-controls,
+.mas-card-heading,
+.mas-progress-label,
+.mas-stage-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mas-header {
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.mas-eyebrow,
+.mas-canvas-label {
+  color: #60a5fa;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.mas-controls {
+  flex-wrap: wrap;
+}
+
+.mas-controls label,
+.mas-controls button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mas-selectors {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.mas-selectors label {
+  display: grid;
+  gap: 8px;
+  color: var(--sr-text-secondary);
+  font-size: 12px;
+}
+
+.mas-selectors select {
+  width: 100%;
+  padding: 12px;
+  background: #0b1420;
+  border: 1px solid #334155;
+  border-radius: 7px;
+  color: #e2e8f0;
+}
+
+.mas-observation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #60a5fa;
+}
+
+.mas-observation small {
+  display: block;
+  color: #94a3b8;
+  margin-top: 5px;
+}
+
+.mas-canvas {
+  padding: 24px;
+  border: 1px solid #29394d;
+  border-radius: 12px;
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      #172d484d,
+      transparent 65%
+    ),
+    linear-gradient(
+      #94a3b809 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      #94a3b809 1px,
+      transparent 1px
+    ),
+    #0b1420;
+  background-size: auto, 24px 24px, 24px 24px, auto;
+}
+
+.mas-canvas-label {
+  margin-bottom: 24px;
+}
+
+.mas-pipeline {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.mas-stage-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.mas-stage {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid;
+  border-radius: 10px;
+  background: #111d2c;
+}
+
+.mas-stage strong {
+  font-size: 14px;
+}
+
+.mas-stage small,
+.mas-storage-card small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.mas-stage-value {
+  margin-top: 10px;
+  font-size: 28px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.mas-connector {
+  position: absolute;
+  right: -24px;
+  top: 48%;
+  color: #60a5fa;
+}
+
+.mas-animated .mas-connector {
+  animation: mas-arrow 1.8s ease-in-out infinite;
+}
+
+.mas-branches {
+  display: flex;
+  justify-content: space-around;
+  height: 58px;
+}
+
+.mas-branches span {
+  width: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #60a5fa 0 7px,
+    transparent 7px 15px
+  );
+  background-size: 100% 30px;
+}
+
+.mas-animated .mas-branches span {
+  animation: mas-flow 1.5s linear infinite;
+}
+
+.mas-storage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.mas-storage-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  background: #111d2c;
+  border: 1px solid #334155;
+  border-radius: 10px;
+}
+
+.mas-card-heading {
+  justify-content: flex-start;
+  color: #93c5fd;
+}
+
+.mas-disk,
+.mas-database,
+.mas-snapshot {
+  position: relative;
+  height: 118px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.mas-disk > div {
+  width: 116px;
+  height: 19px;
+  margin: 3px;
+  border: 1px solid #a78bfa;
+  border-radius: 5px;
+  background: #a78bfa18;
+  box-shadow: 0 0 14px #a78bfa12;
+}
+
+.mas-database > div {
+  width: 106px;
+  height: 27px;
+  margin-top: -4px;
+  border: 1px solid #2dd4bf;
+  border-radius: 50%;
+  background: #123633;
+}
+
+.mas-disk span,
+.mas-database span {
+  margin-top: 8px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #94a3b8;
+}
+
+.mas-snapshot {
+  color: #a78bfa;
+}
+
+.mas-animated .mas-disk > div,
+.mas-animated .mas-database > div {
+  animation: mas-breathe 3s ease-in-out infinite;
+}
+
+.mas-animated .mas-disk > div:nth-child(2),
+.mas-animated .mas-database > div:nth-child(2) {
+  animation-delay: .4s;
+}
+
+.mas-animated .mas-disk > div:nth-child(3),
+.mas-animated .mas-database > div:nth-child(3) {
+  animation-delay: .8s;
+}
+
+.mas-progress-label {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.mas-progress {
+  height: 9px;
+  border-radius: 5px;
+  background: #243247;
+  overflow: hidden;
+}
+
+.mas-progress > div {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #c084fc);
+  border-radius: 5px;
+  transition: width .8s ease;
+}
+
+.mas-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mas-metrics > div {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border-radius: 6px;
+  background: #1a293b;
+}
+
+.mas-metrics strong {
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mas-status {
+  margin-top: auto;
+  padding: 10px;
+  background: #60a5fa0d;
+  border: 1px solid #60a5fa22;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #93c5fd;
+  text-align: center;
+}
+
+.mas-note {
+  margin-top: 16px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.mas-error {
+  padding: 12px;
+  border: 1px solid #f87171;
+  border-radius: 6px;
+  color: #fca5a5;
+  overflow-wrap: anywhere;
+}
+
+@keyframes mas-arrow {
+  0%, 100% {
+    transform: translateX(-2px);
+    opacity: .45;
+  }
+  50% {
+    transform: translateX(3px);
+    opacity: 1;
+  }
+}
+
+@keyframes mas-flow {
+  to {
+    background-position: 0 30px;
+  }
+}
+
+@keyframes mas-breathe {
+  0%, 100% {
+    filter: brightness(.9);
+  }
+  50% {
+    filter: brightness(1.35);
+  }
+}
+
+@media (max-width: 1100px) {
+  .mas-pipeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mas-stage-wrap:nth-child(2) .mas-connector {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .mas-selectors,
+  .mas-pipeline,
+  .mas-storage-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mas-connector,
+  .mas-branches {
+    display: none;
+  }
+
+  .mas-storage-grid {
+    margin-top: 20px;
+  }
+
+  .mas-canvas {
+    padding: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mas-panel *,
+  .mas-panel *::before,
+  .mas-panel *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

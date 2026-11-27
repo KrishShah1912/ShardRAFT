@@ -1,0 +1,140 @@
+.multi-app .sidebar {
+  background: var(--sr-sidebar);
+  border-color: var(--sr-border);
+}
+
+.multi-app .main-content {
+  min-width: 0;
+}
+
+.multi-app .page-header h1 {
+  font-size: var(--sr-font-xl);
+  font-weight: 650;
+  letter-spacing: -.025em;
+  line-height: 1.25;
+}
+
+.multi-app .page-header p {
+  font-size: var(--sr-font-base);
+  color: var(--sr-text-secondary);
+  line-height: 1.6;
+}
+
+.multi-app .ma-overview {
+  gap: var(--sr-space-4);
+}
+
+.multi-app .ma-toolbar {
+  padding-bottom: var(--sr-space-3);
+  margin-bottom: var(--sr-space-4);
+}
+
+.multi-app .ma-stat-grid {
+  gap: var(--sr-space-3);
+}
+
+.multi-app .ma-stat,
+.multi-app .ma-panel {
+  padding: var(--sr-space-4);
+  border-radius: var(--sr-radius-lg);
+  border-color: var(--sr-border);
+  background: var(--sr-surface);
+}
+
+.multi-app .ma-stat {
+  gap: var(--sr-space-2);
+}
+
+.multi-app .ma-stat span {
+  font-size: var(--sr-font-sm);
+}
+
+.multi-app .ma-stat strong {
+  font-size: var(--sr-font-xl);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.025em;
+}
+
+.multi-app .ma-panel h2 {
+  font-size: var(--sr-font-md);
+  font-weight: 650;
+}
+
+.multi-app .ma-panel table {
+  font-size: var(--sr-font-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.multi-app .ma-panel th,
+.multi-app .ma-panel td {
+  padding: 10px 8px;
+}
+
+.multi-app .ma-panel th {
+  color: var(--sr-text-secondary);
+}
+
+.multi-app code,
+.multi-app pre {
+  font-family: var(--sr-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.multi-app button,
+.multi-app a,
+.multi-app input,
+.multi-app select,
+.multi-app textarea {
+  transition:
+    background-color var(--sr-motion-fast) ease,
+    border-color var(--sr-motion-fast) ease,
+    color var(--sr-motion-fast) ease;
+}
+
+.multi-app button:focus-visible,
+.multi-app a:focus-visible,
+.multi-app input:focus-visible,
+.multi-app select:focus-visible,
+.multi-app textarea:focus-visible {
+  outline: 2px solid var(--sr-primary);
+  outline-offset: 3px;
+}
+
+.multi-app button:disabled {
+  cursor: not-allowed;
+}
+
+.multi-app ::selection {
+  background: var(--sr-primary);
+  color: var(--sr-canvas);
+}
+
+.multi-app ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.multi-app ::-webkit-scrollbar-track {
+  background: var(--sr-canvas);
+}
+
+.multi-app ::-webkit-scrollbar-thumb {
+  background: var(--sr-border-strong);
+  border-radius: 8px;
+}
+
+.multi-app ::-webkit-scrollbar-thumb:hover {
+  background: var(--sr-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .multi-app *,
+  .multi-app *::before,
+  .multi-app *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

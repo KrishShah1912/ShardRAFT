@@ -48,11 +48,72 @@ export function useMultiRaftCluster(
   const [lastUpdated, setLastUpdated] =
     useState<number | null>(null);
 
+  const [lastPollStartedAt, setLastPollStartedAt] =
+    useState<number | null>(null);
+
   const [clusterErrors, setClusterErrors] =
     useState<string[]>([]);
 
   const [controlError, setControlError] =
     useState("");
+
+  const actionOwner = useRef<string | null>(null);
+
+  const [actionLocked, setActionLocked] =
+    useState(false);
+
+  const [actionCompletedAt, setActionCompletedAt] =
+    useState<number | null>(null);
+
+  const [lastControlPollStartedAt, setLastControlPollStartedAt] =
+    useState<number | null>(null);
+
+  const acquireAction = useCallback(() => {
+    if (actionOwner.current !== null) {
+      return null;
+    }
+
+    const token = crypto.randomUUID();
+
+    actionOwner.current = token;
+    setActionCompletedAt(null);
+    setActionLocked(true);
+
+    return token;
+  }, []);
+
+  const finishAction = useCallback((token: string) => {
+    if (actionOwner.current !== token) return;
+
+    setActionCompletedAt(Date.now());
+  }, []);
+
+  useEffect(() => {
+    if (actionCompletedAt === null) return;
+
+    if (
+      lastPollStartedAt === null ||
+      lastControlPollStartedAt === null ||
+      lastPollStartedAt <= actionCompletedAt ||
+      lastControlPollStartedAt <= actionCompletedAt ||
+      lastUpdated === null ||
+      !controlAvailable ||
+      loading
+    ) {
+      return;
+    }
+
+    actionOwner.current = null;
+    setActionCompletedAt(null);
+    setActionLocked(false);
+  }, [
+    actionCompletedAt,
+    lastPollStartedAt,
+    lastControlPollStartedAt,
+    lastUpdated,
+    controlAvailable,
+    loading,
+  ]);
 
   const generation = useRef(0);
   const active = useRef(false);
@@ -74,6 +135,8 @@ export function useMultiRaftCluster(
     }
 
     clusterFlight.current = token;
+
+    const pollStartedAt = Date.now();
 
     const current = () =>
       active.current &&
@@ -146,6 +209,7 @@ export function useMultiRaftCluster(
       setMetadata(availableMetadata);
       setShardMap(availableMaps[0] ?? null);
       setClusterErrors(nextErrors);
+      setLastPollStartedAt(pollStartedAt);
       setLastUpdated(Date.now());
 
     } catch (error) {
@@ -154,6 +218,7 @@ export function useMultiRaftCluster(
         setMetadata([]);
         setShardMap(null);
         setLastUpdated(null);
+        setLastPollStartedAt(null);
 
         setClusterErrors([
           "Cluster observations unavailable: " +
@@ -183,6 +248,8 @@ export function useMultiRaftCluster(
 
     controlFlight.current = token;
 
+    const controlPollStartedAt = Date.now();
+
     const current = () =>
       active.current &&
       generation.current === token;
@@ -193,6 +260,7 @@ export function useMultiRaftCluster(
       if (!current()) return;
 
       setServices(result);
+      setLastControlPollStartedAt(controlPollStartedAt);
       setControlAvailable(true);
       setControlError("");
 
@@ -200,6 +268,7 @@ export function useMultiRaftCluster(
       if (!current()) return;
 
       setServices([]);
+      setLastControlPollStartedAt(null);
       setControlAvailable(false);
 
       setControlError(
@@ -286,6 +355,10 @@ export function useMultiRaftCluster(
 
     loading,
     lastUpdated,
+    lastPollStartedAt,
+    actionLocked,
+    acquireAction,
+    finishAction,
     errors,
     refresh,
   };

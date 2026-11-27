@@ -6,7 +6,7 @@ export default function App() {
     window.location.search,
   );
 
-  return params.get("mode") === "multi"
-    ? <MultiRaftApp />
-    : <LegacyApp />;
+  return params.get("mode") === "legacy"
+    ? <LegacyApp />
+    : <MultiRaftApp />;
 }

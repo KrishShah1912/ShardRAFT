@@ -1,0 +1,309 @@
+.multi-app [data-tone="neutral"] {
+  --sr-tone: var(--sr-neutral);
+}
+
+.multi-app [data-tone="primary"] {
+  --sr-tone: var(--sr-primary);
+}
+
+.multi-app [data-tone="success"] {
+  --sr-tone: var(--sr-success);
+}
+
+.multi-app [data-tone="warning"] {
+  --sr-tone: var(--sr-warning);
+}
+
+.multi-app [data-tone="danger"] {
+  --sr-tone: var(--sr-danger);
+}
+
+.multi-app [data-tone="replication"] {
+  --sr-tone: var(--sr-replication);
+}
+
+.multi-app [data-tone="heartbeat"] {
+  --sr-tone: var(--sr-heartbeat);
+}
+
+.multi-app .sr-panel,
+.multi-app .sr-metric,
+.multi-app .sr-inspector {
+  min-width: 0;
+  border: 1px solid var(--sr-border);
+  border-radius: var(--sr-radius-lg);
+  background: var(--sr-surface);
+}
+
+.multi-app .sr-panel {
+  display: grid;
+  gap: var(--sr-space-4);
+  padding: var(--sr-space-4);
+}
+
+.multi-app .sr-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sr-space-2);
+  padding: var(--sr-space-4);
+  transition:
+    border-color var(--sr-motion-fast) ease,
+    background var(--sr-motion-fast) ease;
+}
+
+.multi-app .sr-metric:hover {
+  border-color: var(--sr-border-strong);
+  background: var(--sr-elevated);
+}
+
+.multi-app .sr-metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sr-space-2);
+  color: var(--sr-text-secondary);
+  font-size: var(--sr-font-sm);
+}
+
+.multi-app .sr-metric-header svg {
+  color: var(--sr-tone);
+  flex-shrink: 0;
+}
+
+.multi-app .sr-metric-value {
+  color: var(--sr-text);
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+
+.multi-app .sr-metric:not([data-tone="neutral"]) .sr-metric-value {
+  color: var(--sr-tone);
+}
+
+.multi-app .sr-metric-detail {
+  color: var(--sr-text-muted);
+  font-size: var(--sr-font-xs);
+  line-height: 1.5;
+}
+
+.multi-app .sr-status,
+.multi-app .sr-live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: var(--sr-tone);
+  font-size: var(--sr-font-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.multi-app .sr-status {
+  padding: 4px 8px;
+  border: 1px solid color-mix(
+    in srgb,
+    var(--sr-tone) 25%,
+    transparent
+  );
+  border-radius: var(--sr-radius-sm);
+  background: color-mix(
+    in srgb,
+    var(--sr-tone) 9%,
+    transparent
+  );
+}
+
+.multi-app .sr-status-dot,
+.multi-app .sr-live-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.multi-app .sr-live-dot {
+  position: relative;
+}
+
+.multi-app .sr-live-indicator[data-state="connected"] .sr-live-dot::after {
+  position: absolute;
+  inset: -3px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  content: "";
+  animation: sr-connection-pulse 2.8s
+    ease-out infinite;
+}
+
+@keyframes sr-connection-pulse {
+  0% {
+    transform: scale(.75);
+    opacity: .8;
+  }
+
+  80%, 100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.multi-app .sr-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sr-space-3);
+}
+
+.multi-app .sr-section-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.multi-app .sr-section-header h2 {
+  margin: 0;
+  color: var(--sr-text);
+  font-size: var(--sr-font-md);
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.multi-app .sr-section-header p {
+  margin: 0;
+  color: var(--sr-text-muted);
+  font-size: var(--sr-font-sm);
+  line-height: 1.6;
+}
+
+.multi-app .sr-eyebrow {
+  color: var(--sr-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
+.multi-app .sr-section-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sr-space-2);
+}
+
+.multi-app .sr-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border: 1px solid var(--sr-border-strong);
+  border-radius: var(--sr-radius-md);
+  background: var(--sr-elevated);
+  color: var(--sr-text);
+  font-size: var(--sr-font-sm);
+}
+
+.multi-app .sr-button:hover:not(:disabled) {
+  background: var(--sr-hover);
+  border-color: var(--sr-primary);
+}
+
+.multi-app .sr-button:disabled {
+  opacity: .45;
+}
+
+.multi-app .sr-empty-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--sr-space-2);
+  padding: var(--sr-space-8)
+    var(--sr-space-4);
+  border: 1px dashed var(--sr-border);
+  border-radius: var(--sr-radius-md);
+  text-align: center;
+}
+
+.multi-app .sr-empty-state strong {
+  color: var(--sr-text-secondary);
+  font-size: var(--sr-font-base);
+  font-weight: 600;
+}
+
+.multi-app .sr-empty-state p {
+  max-width: 440px;
+  margin: 0;
+  color: var(--sr-text-muted);
+  font-size: var(--sr-font-sm);
+  line-height: 1.6;
+}
+
+.multi-app .sr-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--sr-border);
+  border-radius: var(--sr-radius-md);
+}
+
+.multi-app .sr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--sr-font-sm);
+}
+
+.multi-app .sr-table th {
+  padding: 10px 12px;
+  background: var(--sr-elevated);
+  color: var(--sr-text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.multi-app .sr-table td {
+  padding: 10px 12px;
+  border-top: 1px solid var(--sr-border);
+  color: var(--sr-text);
+}
+
+.multi-app .sr-table tbody tr:hover {
+  background: var(--sr-hover);
+}
+
+.multi-app .sr-table .sr-table-empty {
+  padding: 24px 12px;
+  color: var(--sr-text-muted);
+  text-align: center;
+}
+
+.multi-app .sr-numeric {
+  font-family: var(--sr-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.multi-app .sr-inspector {
+  display: grid;
+  align-content: start;
+  gap: var(--sr-space-4);
+  padding: var(--sr-space-4);
+}
+
+.multi-app .sr-inspector-body {
+  display: grid;
+  gap: var(--sr-space-3);
+  min-width: 0;
+}
+
+.multi-app .sr-chart-body {
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .multi-app .sr-live-dot::after {
+    animation: none !important;
+  }
+}

@@ -185,3 +185,41 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Shared quorum protection status */
+
+.mf-quorum-status {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  margin-top: 10px;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.mf-quorum-status strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mf-quorum-status small {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.mf-quorum-allowed {
+  color: #34d399;
+  background: #34d39909;
+}
+
+.mf-quorum-blocked {
+  color: #f87171;
+  background: #f8717109;
+}
+
+.mf-actions button:disabled {
+  cursor: not-allowed;
+  opacity: .4;
+}

@@ -18,19 +18,33 @@ import type {
   MultiRaftClusterState,
 } from "./useMultiRaftCluster";
 
+import { MultiFaultTopology } from "./MultiFaultTopology";
+
+import { MultiFaultTimeline } from "./MultiFaultTimeline";
+
+import { MultiFaultComparison } from "./MultiFaultComparison";
+
+import {
+  captureClusterSnapshot,
+  type ClusterSnapshot,
+} from "./faultSnapshot";
+
+import type {
+  MultiLiveTelemetry,
+} from "./useMultiLiveTelemetry";
+
+import type {
+  FaultReachabilityObservation,
+} from "./faultTimeline";
+
+import { assessNodeQuorum } from "./quorumProtection";
+
 import "./multiFaultLab.css";
 
 interface Props {
   cluster: MultiRaftClusterState;
+  telemetry: MultiLiveTelemetry;
   onOpenConsole: () => void;
-}
-
-interface GroupObservation {
-  shardId: number;
-  leaderId: number | null;
-  reachable: number;
-  majority: boolean;
-  commitSpread: number | null;
 }
 
 interface ActionRecord {
@@ -42,7 +56,11 @@ interface ActionRecord {
   durationMs: number;
   success: boolean;
   output: string;
-  before: GroupObservation[];
+  before: ClusterSnapshot;
+  after: ClusterSnapshot | null;
+  completedAtMs: number;
+  snapshotDeadline: number;
+  snapshotStatus: "pending" | "captured" | "unavailable";
 }
 
 interface LeaderChange {
@@ -53,27 +71,82 @@ interface LeaderChange {
   current: number | null;
 }
 
-function captureGroups(
-  cluster: MultiRaftClusterState,
-): GroupObservation[] {
-  return cluster.shards.map(shard => ({
-    shardId: shard.shardId,
-    leaderId: shard.leaderId,
-    reachable: shard.reachableReplicas,
-    majority: shard.majorityReachable,
-    commitSpread: shard.replicationLag,
-  }));
-}
-
 function leaderLabel(id: number | null) {
   return id ? `Node ${id}` : "Unknown";
 }
 
 export function MultiFaultLab({
-  cluster,
+  cluster, telemetry,
   onOpenConsole,
 }: Props) {
   const [busy, setBusy] = useState(false);
+
+  const [reachabilityChanges, setReachabilityChanges] =
+    useState<FaultReachabilityObservation[]>([]);
+
+  const previousReachability = useRef(
+    new Map<number, boolean>(),
+  );
+
+  const lastReachabilityPoll =
+    useRef<number | null>(null);
+
+  useEffect(() => {
+    if (
+      cluster.loading ||
+      cluster.lastUpdated === null ||
+      cluster.lastUpdated === lastReachabilityPoll.current
+    ) {
+      return;
+    }
+
+    const observedAt = cluster.lastUpdated;
+
+    lastReachabilityPoll.current = observedAt;
+
+    const current = new Map<number, boolean>();
+
+    const transitions: FaultReachabilityObservation[] = [];
+
+    for (const observation of cluster.observations) {
+      const nodeId = observation.id;
+
+      current.set(
+        nodeId,
+        observation.reachable,
+      );
+
+      const previous =
+        previousReachability.current.get(nodeId);
+
+      if (
+        previous !== undefined &&
+        previous !== observation.reachable
+      ) {
+        transitions.push({
+          id: crypto.randomUUID(),
+          timestamp: new Date(observedAt).toISOString(),
+          nodeId,
+          reachable: observation.reachable,
+        });
+      }
+    }
+
+    previousReachability.current = current;
+
+    if (transitions.length > 0) {
+      setReachabilityChanges(existing =>
+        [...transitions, ...existing].slice(0, 200),
+      );
+    }
+  }, [
+    cluster.loading,
+    cluster.lastUpdated,
+    cluster.observations,
+  ]);
+
+  const [protectionMessage, setProtectionMessage] =
+    useState("");
 
   const [activeAction, setActiveAction] =
     useState("");
@@ -81,13 +154,137 @@ export function MultiFaultLab({
   const [history, setHistory] =
     useState<ActionRecord[]>([]);
 
-  const [selected, setSelected] =
-    useState<ActionRecord | null>(null);
+  const [selectedId, setSelectedId] =
+    useState<string | null>(null);
+
+  const selected = history.find(
+    item => item.id === selectedId,
+  ) ?? null;
+
+  const snapshotPending = history.some(
+    item => item.snapshotStatus === "pending",
+  );
+
+  useEffect(() => {
+    if (!snapshotPending) return;
+
+    const now = Date.now();
+
+    const snapshot = captureClusterSnapshot(
+      cluster,
+      now,
+    );
+
+    const pollStartedAt =
+      cluster.lastPollStartedAt;
+
+    setHistory(items => {
+      let changed = false;
+
+      const next = items.map(record => {
+        if (record.snapshotStatus !== "pending") {
+          return record;
+        }
+
+        if (now >= record.snapshotDeadline) {
+          changed = true;
+
+          return {
+            ...record,
+            snapshotStatus: "unavailable" as const,
+          };
+        }
+
+        if (
+          !snapshot.available ||
+          snapshot.observedAt === null ||
+          pollStartedAt === null ||
+          pollStartedAt <= record.completedAtMs ||
+          snapshot.observedAt <= record.completedAtMs
+        ) {
+          return record;
+        }
+
+        changed = true;
+
+        return {
+          ...record,
+          after: snapshot,
+          snapshotStatus: "captured" as const,
+        };
+      });
+
+      return changed ? next : items;
+    });
+  }, [
+    snapshotPending,
+    history,
+    cluster.loading,
+    cluster.lastUpdated,
+    cluster.lastPollStartedAt,
+    cluster.observations,
+    cluster.shards,
+    cluster.metadata,
+    cluster.metadataLeader,
+  ]);
+
+  useEffect(() => {
+    if (!snapshotPending) return;
+
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+
+      setHistory(items => {
+        let changed = false;
+
+        const next = items.map(record => {
+          if (
+            record.snapshotStatus !== "pending" ||
+            now < record.snapshotDeadline
+          ) {
+            return record;
+          }
+
+          changed = true;
+
+          return {
+            ...record,
+            snapshotStatus: "unavailable" as const,
+          };
+        });
+
+        return changed ? next : items;
+      });
+    }, 500);
+
+    return () => window.clearInterval(timer);
+  }, [snapshotPending]);
 
   const [changes, setChanges] =
     useState<LeaderChange[]>([]);
 
   const executing = useRef(false);
+
+  const sharedActionToken =
+    useRef<string | null>(null);
+
+  useEffect(() => {
+    if (busy || snapshotPending) return;
+
+    const token = sharedActionToken.current;
+
+    if (token === null) return;
+
+    sharedActionToken.current = null;
+    cluster.finishAction(token);
+
+    void cluster.refresh();
+  }, [
+    busy,
+    snapshotPending,
+    cluster.finishAction,
+    cluster.refresh,
+  ]);
 
   const previousLeaders = useRef<
     Record<string, number | null> | null
@@ -147,55 +344,105 @@ export function MultiFaultLab({
   ) {
     if (
       executing.current ||
+      cluster.actionLocked ||
+      snapshotPending ||
       !cluster.controlAvailable
     ) {
       return;
     }
 
-    const affected = cluster.shards.filter(
-      shard => shard.replicas.some(
-        replica => replica.nodeId === node,
-      ),
+    setProtectionMessage("");
+
+    const service = cluster.services.find(
+      item => item.service === `n${node}`,
     );
 
-    const risks = affected.filter(
-      shard =>
-        shard.reachableReplicas <= 2 &&
-        shard.replicas.some(
-          replica =>
-            replica.nodeId === node &&
-            replica.reachable,
-        ),
-    );
+    if (!service) {
+      setProtectionMessage(
+        "Container observations are unavailable.",
+      );
+      return;
+    }
+
+    if (
+      action === "start" &&
+      service.state !== "exited" &&
+      service.state !== "created"
+    ) {
+      setProtectionMessage(
+        "Start requires a stopped container.",
+      );
+      return;
+    }
+
+    if (
+      action !== "start" &&
+      service.state !== "running"
+    ) {
+      setProtectionMessage(
+        "Stop and Restart require a running container.",
+      );
+      return;
+    }
 
     if (action !== "start") {
+      const assessment = assessNodeQuorum(
+        cluster,
+        node,
+      );
+
+      if (!assessment.allowed) {
+        setProtectionMessage(
+          `Action blocked: ${assessment.reason}`,
+        );
+        return;
+      }
+
       const warning = [
         `${action.toUpperCase()} Node ${node}?`,
         "",
         "This changes the local Docker deployment.",
         "",
-        `Hosted data groups: ${
-          affected.map(
-            shard => `S${shard.shardId}`,
-          ).join(", ")
-        }`,
-        node <= 3
-          ? "This node also hosts metadata."
-          : "",
-        risks.length
-          ? "Warning: affected data groups may lose a reachable majority."
-          : "",
-        "Use only the local demonstration cluster.",
-      ].filter(Boolean).join("\n");
+        "Projected reachable replicas:",
+        ...assessment.affected.map(group =>
+          `${group.label}: ${group.current}/3 -> ${group.remaining}/3`,
+        ),
+        "",
+        "All configured groups retain an observed majority.",
+        "This is an observation-based assessment, not a consensus guarantee.",
+      ].join("\\n");
 
       if (!window.confirm(warning)) return;
+
+      const finalAssessment = assessNodeQuorum(
+        cluster,
+        node,
+      );
+
+      if (!finalAssessment.allowed) {
+        setProtectionMessage(
+          `Action blocked: ${finalAssessment.reason}`,
+        );
+        return;
+      }
     }
+
+    const token = cluster.acquireAction();
+
+    if (token === null) {
+      setProtectionMessage(
+        "Another cluster action is active.",
+      );
+      return;
+    }
+
+    sharedActionToken.current = token;
 
     executing.current = true;
     setBusy(true);
     setActiveAction(`${action} Node ${node}`);
 
-    const before = captureGroups(cluster);
+    const before = captureClusterSnapshot(cluster);
 
     const startedAt = new Date().toISOString();
     const start = performance.now();
@@ -226,12 +473,19 @@ export function MultiFaultLab({
         "Action outcome not confirmed: " +
         String(failure);
     } finally {
+      const completedAtMs = Date.now();
+
       const record: ActionRecord = {
         id: crypto.randomUUID(),
         node,
         action,
         startedAt,
-        completedAt: new Date().toISOString(),
+        completedAt:
+          new Date(completedAtMs).toISOString(),
+        completedAtMs,
+        snapshotDeadline: completedAtMs + 15000,
+        snapshotStatus: "pending",
+        after: null,
         durationMs: performance.now() - start,
         success,
         output,
@@ -242,13 +496,20 @@ export function MultiFaultLab({
         [record, ...items].slice(0, 50),
       );
 
-      setSelected(record);
+      setSelectedId(record.id);
 
-      executing.current = false;
-      setBusy(false);
-      setActiveAction("");
-
-      void cluster.refresh();
+      try {
+        await cluster.refresh();
+      } catch (error) {
+        setProtectionMessage(
+          "Unable to refresh cluster observations: " +
+          String(error),
+        );
+      } finally {
+        executing.current = false;
+        setBusy(false);
+        setActiveAction("");
+      }
     }
   }
 
@@ -335,6 +596,36 @@ export function MultiFaultLab({
         </div>
       )}
 
+      {cluster.actionLocked && !busy && !snapshotPending && (
+        <div className="mf-notice" role="status">
+          Cluster action coordination is active.
+          Waiting for fresh cluster and Docker observations.
+        </div>
+      )}
+
+      {snapshotPending && (
+        <div className="mf-notice" role="status">
+          Waiting for a fresh post-action observation.
+          Node controls remain disabled until the
+          snapshot is captured or the wait expires.
+        </div>
+      )}
+
+      {protectionMessage && (
+        <div className="mf-warning" role="alert">
+          {protectionMessage}
+        </div>
+      )}
+
+      <MultiFaultTopology cluster={cluster} />
+
+      <MultiFaultTimeline
+        telemetry={telemetry}
+        actions={history}
+        leadership={changes}
+        reachability={reachabilityChanges}
+      />
+
       <article className="ma-panel">
         <div className="mf-heading">
           <h2>Physical node controls</h2>
@@ -372,8 +663,20 @@ export function MultiFaultLab({
 
             const disabled =
               busy ||
+              cluster.actionLocked ||
+              snapshotPending ||
               !cluster.controlAvailable ||
               !service;
+
+            const assessment = assessNodeQuorum(
+              cluster,
+              id,
+            );
+
+            const disruptiveDisabled =
+              disabled ||
+              !running ||
+              !assessment.allowed;
 
             return (
               <div
@@ -446,7 +749,8 @@ export function MultiFaultLab({
 
                   <button
                     className="mf-stop"
-                    disabled={disabled || !running}
+                    disabled={disruptiveDisabled}
+                    title={assessment.reason}
                     onClick={() =>
                       void execute(id, "stop")
                     }
@@ -455,7 +759,8 @@ export function MultiFaultLab({
                   </button>
 
                   <button
-                    disabled={disabled || !running}
+                    disabled={disruptiveDisabled}
+                    title={assessment.reason}
                     onClick={() =>
                       void execute(id, "restart")
                     }
@@ -463,6 +768,25 @@ export function MultiFaultLab({
                     Restart
                   </button>
                 </div>
+
+                {running && (
+                  <div
+                    className={
+                      "mf-quorum-status " +
+                      (assessment.allowed
+                        ? "mf-quorum-allowed"
+                        : "mf-quorum-blocked")
+                    }
+                  >
+                    <strong>
+                      {assessment.allowed
+                        ? "Majority retained"
+                        : "Quorum protection active"}
+                    </strong>
+
+                    <small>{assessment.reason}</small>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -628,6 +952,7 @@ export function MultiFaultLab({
                   <th>Action</th>
                   <th>Result</th>
                   <th>API duration</th>
+                  <th>Snapshot</th>
                   <th>Details</th>
                 </tr>
               </thead>
@@ -661,9 +986,17 @@ export function MultiFaultLab({
                     </td>
 
                     <td>
+                      {record.snapshotStatus === "captured"
+                        ? "Captured"
+                        : record.snapshotStatus === "pending"
+                          ? "Pending"
+                          : "Unavailable"}
+                    </td>
+
+                    <td>
                       <button
                         onClick={() =>
-                          setSelected(record)
+                          setSelectedId(record.id)
                         }
                       >
                         Inspect
@@ -689,66 +1022,28 @@ export function MultiFaultLab({
             {selected.output || "No command output"}
           </pre>
 
-          <h3>Before action vs current observation</h3>
-
-          <div className="ma-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Shard</th>
-                  <th>Previous leader</th>
-                  <th>Current leader</th>
-                  <th>Previous reachability</th>
-                  <th>Current reachability</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {selected.before.map(before => {
-                  const current =
-                    cluster.shards.find(
-                      item =>
-                        item.shardId ===
-                        before.shardId,
-                    );
-
-                  return (
-                    <tr key={before.shardId}>
-                      <td>
-                        Shard {before.shardId}
-                      </td>
-
-                      <td>
-                        {leaderLabel(before.leaderId)}
-                      </td>
-
-                      <td>
-                        {leaderLabel(
-                          current?.leaderId ?? null,
-                        )}
-                      </td>
-
-                      <td>{before.reachable}/3</td>
-
-                      <td>
-                        {current?.reachableReplicas
-                          ?? "—"}/3
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <p>
-            The current observation continues to
-            update and is not a fixed post-action
-            snapshot. API duration is not failover
-            or recovery duration.
-          </p>
         </article>
       )}
+
+      <MultiFaultComparison
+        before={selected?.before ?? null}
+        after={selected?.after ?? null}
+        actionLabel={
+          selected
+            ? `${selected.action.toUpperCase()} Node ${selected.node}`
+            : undefined
+        }
+        pending={
+          selected?.snapshotStatus === "pending"
+        }
+        message={
+          selected?.snapshotStatus === "unavailable"
+            ? "No eligible post-action observation was captured within 15 seconds."
+            : selected && !selected.success
+              ? "Docker action outcome was not confirmed. Snapshot differences do not establish that the action succeeded."
+              : undefined
+        }
+      />
 
       <article className="ma-panel">
         <h2>Demonstration workflow</h2>

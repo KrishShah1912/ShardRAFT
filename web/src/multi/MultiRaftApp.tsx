@@ -1,29 +1,100 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 
-import { Sidebar } from "../components/Sidebar";
+import { MultiSidebar } from "./MultiSidebar";
+import { MultiWorkspaceToolbar } from "./MultiWorkspaceToolbar";
+import { MultiOverviewMetrics } from "./MultiOverviewMetrics";
+import { MultiOverviewShardHealth } from "./MultiOverviewShardHealth";
+import { MultiLiveTopology } from "./MultiLiveTopology";
 import type { Page } from "../types";
 
 import { useMultiRaftCluster } from "./useMultiRaftCluster";
 import { MultiQueryConsole } from "./MultiQueryConsole";
 
-import { MultiArchitecture } from "./MultiArchitecture";
-
-import { MultiCluster, MultiReplication } from "./MultiConsensus";
-
-import { MultiShards } from "./MultiShards";
-
-import { MultiDataDiagnostics } from "./MultiDataDiagnostics";
-
-import { MultiTransport, MultiMetrics, MultiEvents } from "./MultiTelemetry";
 
 import { MultiFaultLab } from "./MultiFaultLab";
 
-import {
-  MultiPerformanceLab,
-  MultiTestLab,
-} from "./MultiEvaluation";
+
+import { useMultiLiveTelemetry } from "./useMultiLiveTelemetry";
+import { MultiHeartbeatTelemetry } from "./MultiHeartbeatTelemetry";
 
 import "./multiApp.css";
+import "../design-system/tokens.css";
+import "../design-system/foundation.css";
+import "../design-system/components.css";
+
+const MultiArchitecture = lazy(() =>
+  import("./MultiArchitecture").then(module => ({
+    default: module.MultiArchitecture,
+  })),
+);
+
+const MultiCluster = lazy(() =>
+  import("./MultiConsensus").then(module => ({
+    default: module.MultiCluster,
+  })),
+);
+
+const MultiReplication = lazy(() =>
+  import("./MultiConsensus").then(module => ({
+    default: module.MultiReplication,
+  })),
+);
+
+const MultiShards = lazy(() =>
+  import("./MultiShards").then(module => ({
+    default: module.MultiShards,
+  })),
+);
+
+const MultiDataDiagnostics = lazy(() =>
+  import("./MultiDataDiagnostics").then(module => ({
+    default: module.MultiDataDiagnostics,
+  })),
+);
+
+const MultiTransport = lazy(() =>
+  import("./MultiTelemetry").then(module => ({
+    default: module.MultiTransport,
+  })),
+);
+
+const MultiMetrics = lazy(() =>
+  import("./MultiTelemetry").then(module => ({
+    default: module.MultiMetrics,
+  })),
+);
+
+const MultiEvents = lazy(() =>
+  import("./MultiTelemetry").then(module => ({
+    default: module.MultiEvents,
+  })),
+);
+
+const MultiPerformanceLab = lazy(() =>
+  import("./MultiEvaluation").then(module => ({
+    default: module.MultiPerformanceLab,
+  })),
+);
+
+const MultiTestLab = lazy(() =>
+  import("./MultiEvaluation").then(module => ({
+    default: module.MultiTestLab,
+  })),
+);
+
+function PageLoading() {
+  return (
+    <article
+      className="ma-panel"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <h2>Loading workspace</h2>
+      <p>Preparing the requested dashboard page.</p>
+    </article>
+  );
+}
 
 const PAGE_NAMES: Record<Page, string> = {
   overview: "Overview",
@@ -48,50 +119,24 @@ export default function MultiRaftApp() {
     useState<Page>("overview");
 
   const cluster = useMultiRaftCluster();
+  const telemetry = useMultiLiveTelemetry();
 
-  const observedLeaders = cluster.shards.filter(
-    shard => shard.leaderId !== null,
-  ).length;
-
-  const observedMajorities = cluster.shards.filter(
-    shard => shard.majorityReachable,
-  ).length;
 
   return (
     <div className="app-shell multi-app">
-      <Sidebar
+      <MultiSidebar
         page={page}
         onChange={setPage}
-        mode="multi"
         reachableNodes={cluster.reachableNodes}
         loading={cluster.loading}
       />
 
       <main className="main-content">
-        <div className="ma-toolbar">
-          <div className="ma-mode">
-            MULTI-RAFT DEPLOYMENT
-          </div>
-
-          <div className="ma-toolbar-right">
-            <span>
-              {cluster.loading
-                ? "Connecting..."
-                : cluster.lastUpdated
-                  ? `Observed ${new Date(
-                      cluster.lastUpdated,
-                    ).toLocaleTimeString()}`
-                  : "Awaiting observations"}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => void cluster.refresh()}
-            >
-              Refresh
-            </button>
-          </div>
-        </div>
+        <MultiWorkspaceToolbar
+          page={page}
+          cluster={cluster}
+          telemetry={telemetry}
+        />
 
         {cluster.errors.length > 0 && (
           <details className="ma-errors">
@@ -124,102 +169,21 @@ export default function MultiRaftApp() {
               </div>
             </header>
 
-            <div className="ma-stat-grid">
-              {[
-                {
-                  label: "Reachable storage nodes",
-                  value: `${cluster.reachableNodes}/5`,
-                },
-                {
-                  label: "Observed shard leaders",
-                  value: `${observedLeaders}/4`,
-                },
-                {
-                  label: "Reachable shard majorities",
-                  value: `${observedMajorities}/4`,
-                },
-                {
-                  label: "Metadata leader",
-                  value: cluster.metadataLeader
-                    ? `Node ${cluster.metadataLeader}`
-                    : "Unknown",
-                },
-                {
-                  label: "Metadata epoch",
-                  value:
-                    cluster.shardMap?.shard_map.epoch
-                    ?? "Unknown",
-                },
-                {
-                  label: "Docker control",
-                  value: cluster.controlAvailable
-                    ? "Available"
-                    : "Unavailable",
-                },
-              ].map(stat => (
-                <article
-                  className="ma-stat"
-                  key={stat.label}
-                >
-                  <span>{stat.label}</span>
+            <MultiOverviewMetrics cluster={cluster} />
 
-                  <strong>
-                    {cluster.loading ? "—" : stat.value}
-                  </strong>
-                </article>
-              ))}
+            <div className="sr-overview-topology">
+              <MultiLiveTopology
+                cluster={cluster}
+                telemetry={telemetry}
+              />
             </div>
 
-            <article className="ma-panel">
-              <h2>Data shard observations</h2>
+            <MultiHeartbeatTelemetry
+              cluster={cluster}
+              telemetry={telemetry}
+            />
 
-              <p>
-                Reachability is an observation, not proof
-                of consensus availability.
-              </p>
-
-              <div className="ma-table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Shard</th>
-                      <th>Observed leader</th>
-                      <th>Reachable replicas</th>
-                      <th>Commit index spread</th>
-                      <th>Observed state</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {cluster.shards.map(shard => (
-                      <tr key={shard.shardId}>
-                        <td>Shard {shard.shardId}</td>
-
-                        <td>
-                          {shard.leaderId
-                            ? `Node ${shard.leaderId}`
-                            : "Unknown"}
-                        </td>
-
-                        <td>
-                          {shard.reachableReplicas}/3
-                        </td>
-
-                        <td>
-                          {shard.replicationLag ?? "—"}
-                        </td>
-
-                        <td>
-                          {cluster.loading
-                            ? "Loading"
-                            : shard.state}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </article>
+            <MultiOverviewShardHealth cluster={cluster} />
 
             <article className="ma-panel">
               <h2>Execute database operations</h2>
@@ -243,16 +207,25 @@ export default function MultiRaftApp() {
           <MultiQueryConsole cluster={cluster} />
         </div>
 
+        <Suspense fallback={<PageLoading />}>
         {page === "architecture" && (
-          <MultiArchitecture cluster={cluster} />
+          <MultiArchitecture
+            cluster={cluster}
+            telemetry={telemetry}
+          />
         )}
 
         {page === "cluster" && (
-          <MultiCluster cluster={cluster} />
+          <MultiCluster
+            cluster={cluster}
+            telemetry={telemetry}
+          />
         )}
 
         {page === "replication" && (
-          <MultiReplication cluster={cluster} />
+          <MultiReplication cluster={cluster}
+        telemetry={telemetry}
+      />
         )}
 
         {page === "shards" && (
@@ -275,20 +248,23 @@ export default function MultiRaftApp() {
         )}
 
         {page === "metrics" && (
-          <MultiMetrics cluster={cluster} />
+          <MultiMetrics cluster={cluster} telemetry={telemetry} />
         )}
 
         {page === "events" && (
-          <MultiEvents />
+          <MultiEvents telemetry={telemetry} />
         )}
 
+        </Suspense>
+
         <div hidden={page !== "faults"}>
-          <MultiFaultLab
+          <MultiFaultLab telemetry={telemetry}
             cluster={cluster}
             onOpenConsole={() => setPage("console")}
           />
         </div>
 
+        <Suspense fallback={<PageLoading />}>
         {page === "performance" && (
           <MultiPerformanceLab />
         )}
@@ -296,6 +272,8 @@ export default function MultiRaftApp() {
         {page === "test-lab" && (
           <MultiTestLab />
         )}
+
+        </Suspense>
 
         {page !== "overview" &&
           page !== "console" &&

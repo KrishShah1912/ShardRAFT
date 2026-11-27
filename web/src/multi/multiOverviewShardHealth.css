@@ -1,0 +1,192 @@
+.multi-app .sr-overview-shard-health {
+  min-width: 0;
+}
+
+.multi-app .sr-shard-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.multi-app .sr-shard-panel-title svg {
+  color: #34d399;
+}
+
+.multi-app .sr-shard-health-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.multi-app .sr-shard-health-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #293747;
+  border-radius: 9px;
+  background: #101720;
+}
+
+.multi-app .sr-shard-health-heading,
+.multi-app .sr-shard-health-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.multi-app .sr-shard-health-heading {
+  justify-content: space-between;
+}
+
+.multi-app .sr-shard-health-name {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.multi-app .sr-shard-replica-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.multi-app .sr-shard-replica {
+  --replica-color: #60a5fa;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  padding: 11px;
+  background: #172230;
+  border: 1px solid #34465a;
+  border-radius: 7px;
+}
+
+.multi-app .sr-shard-replica[data-tone="success"] {
+  --replica-color: #34d399;
+  border-color: #248b6b;
+  background: #10251f;
+}
+
+.multi-app .sr-shard-replica[data-tone="warning"] {
+  --replica-color: #fbbf24;
+  border-color: #8a681e;
+}
+
+.multi-app .sr-shard-replica[data-tone="danger"] {
+  --replica-color: #f87171;
+  border-color: #843b43;
+  background: #291b23;
+}
+
+.multi-app .sr-shard-replica-role {
+  color: var(--replica-color);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.multi-app .sr-shard-replica > strong {
+  color: #e2e8f0;
+  font-size: 17px;
+}
+
+.multi-app .sr-shard-replica-indicator {
+  height: 3px;
+  background: var(--replica-color);
+  border-radius: 4px;
+  transition: background-color 250ms ease;
+}
+
+.multi-app .sr-shard-replica-term {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.multi-app .sr-shard-replica-index {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 3px;
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.multi-app .sr-shard-replica-index strong {
+  color: #dce6f2;
+  font-variant-numeric: tabular-nums;
+}
+
+.multi-app .sr-shard-health-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  border-top: 1px solid #293747;
+  padding-top: 12px;
+}
+
+.multi-app .sr-shard-health-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.multi-app .sr-shard-health-summary span {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.multi-app .sr-shard-health-summary strong {
+  color: #e2e8f0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.multi-app .sr-shard-health-summary strong[data-tone="success"] {
+  color: #34d399;
+}
+
+.multi-app .sr-shard-health-summary strong[data-tone="warning"] {
+  color: #fbbf24;
+}
+
+.multi-app .sr-shard-health-summary strong[data-tone="danger"] {
+  color: #f87171;
+}
+
+.multi-app .sr-shard-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  font-size: 11px;
+}
+
+.multi-app .sr-shard-health-note {
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .multi-app .sr-shard-health-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 420px) {
+  .multi-app .sr-shard-replica-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .multi-app .sr-shard-replica-indicator {
+    transition: none;
+  }
+}

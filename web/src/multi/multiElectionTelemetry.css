@@ -1,0 +1,165 @@
+.me-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.me-header,
+.me-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.me-header h2 {
+  margin: 6px 0;
+}
+
+.me-badge,
+.me-status {
+  padding: 9px 13px;
+  border: 1px solid #263244;
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.me-toolbar label {
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.me-toolbar select {
+  background: #111827;
+  color: #e2e8f0;
+  border: 1px solid #263244;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.me-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.me-stat {
+  background: #121a26;
+  border: 1px solid #263244;
+  border-radius: 10px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.me-stat small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.me-stat strong {
+  color: #e2e8f0;
+  font-size: 23px;
+}
+
+.me-diagram {
+  background: #0b1017;
+  border: 1px solid #263244;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.me-diagram svg {
+  width: 100%;
+  display: block;
+  max-height: 400px;
+}
+
+.me-packet {
+  offset-distance: 0%;
+  filter: drop-shadow(0 0 5px currentColor);
+  animation: me-vote-travel 2s linear forwards;
+}
+
+@keyframes me-vote-travel {
+  0% {
+    offset-distance: 0%;
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.me-legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-size: 12px;
+}
+
+.me-empty {
+  border: 1px dashed #334155;
+  border-radius: 10px;
+  padding: 25px;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.me-timeline {
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.me-event {
+  display: grid;
+  grid-template-columns: 12px minmax(120px, 1fr) 80px 100px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 5px;
+  border-bottom: 1px solid #263244;
+  font-size: 12px;
+}
+
+.me-event strong,
+.me-event small {
+  display: block;
+}
+
+.me-event small {
+  color: #94a3b8;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.me-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.me-event time,
+.me-event > span {
+  color: #94a3b8;
+}
+
+.me-note {
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .me-packet {
+    animation: none;
+    display: none;
+  }
+}
