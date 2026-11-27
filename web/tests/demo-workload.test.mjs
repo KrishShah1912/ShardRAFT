@@ -5,11 +5,11 @@ import {
   createDemoWorkload,
   validateDemoRoute,
   DEFAULT_DEMO_CONFIG,
-} from "../src/multi/demoWorkload.ts";
+} from "../.test-build/multi/demoWorkload.js";
 
 import {
   previewKeyRouting,
-} from "../src/multi/keyRouting.ts";
+} from "../.test-build/multi/keyRouting.js";
 
 const map = {
   epoch: 1,

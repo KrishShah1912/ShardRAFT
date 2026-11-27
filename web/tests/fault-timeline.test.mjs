@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildFaultTimeline,
   FAULT_TIMELINE_LIMIT,
-} from "../src/multi/faultTimeline.ts";
+} from "../.test-build/multi/faultTimeline.js";
 
 const BASE = 1700000000000;
 
