@@ -44,3 +44,6 @@ __pycache__/
 *.pyc
 /web/playwright-multi-report/
 /web/test-results-multi/
+
+.demo-control.log
+.demo-web.log

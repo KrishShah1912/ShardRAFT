@@ -1,0 +1,10 @@
+node_modules
+dist
+.test-build
+test-results
+test-results-multi
+playwright-report
+playwright-multi-report
+.git
+.DS_Store
+*.log

@@ -32,6 +32,7 @@ Arizona State University.
 
 ## Table of Contents
 
+- [Quick Start — Fresh Machine](#quick-start--fresh-machine)
 - [Project Highlights](#project-highlights)
 - [Key Features](#key-features)
 - [System Architecture](#system-architecture)
@@ -60,6 +61,92 @@ Arizona State University.
 
 ---
 
+## Quick Start — Fresh Machine
+
+The complete ShardRAFT Multi-Raft demo runs locally with Docker Compose.
+This is the recommended setup for instructors, evaluators, and anyone
+who wants to explore the working system without installing the Go or
+frontend development toolchains.
+
+### Prerequisite
+
+Install and start **Docker Desktop** on macOS or Windows, or Docker
+Engine with the Docker Compose plugin on Linux.
+
+Verify Docker:
+
+    docker info
+    docker compose version
+
+**No local Go, Node.js, npm, database, or frontend installation is
+required for the evaluator demo.** Application components are built
+inside Docker.
+
+### Clone and Start
+
+    git clone https://github.com/KrishShah1912/ShardRAFT.git
+    cd ShardRAFT
+    make demo
+
+The demo starts:
+
+- five Multi-Raft storage nodes
+- four independent data Raft groups
+- one replicated metadata Raft group
+- two HTTP gateways
+- the production React dashboard served by nginx
+
+Wait for:
+
+    Storage nodes ..... 5/5 healthy
+    Gateways .......... running
+    Dashboard ......... healthy
+
+    =================================
+    ShardRAFT is ready
+    =================================
+
+Then open:
+
+**http://127.0.0.1:18080**
+
+### Stop the Demo
+
+    make demo-down
+
+Persistent Docker volumes are preserved during normal shutdown.
+
+To inspect running services:
+
+    docker compose ps
+
+### Evaluator and Development Modes
+
+`make demo` is the recommended evaluator workflow. The database,
+gateways, and production dashboard run through Docker.
+
+Host-level Docker lifecycle controls used by the interactive Fault Lab
+are intentionally not exposed through the production dashboard. Full
+fault injection is available through the trusted local development
+workflow documented later in this README.
+
+### Troubleshooting
+
+If Docker is installed but not running, start Docker Desktop and retry:
+
+    make demo
+
+If another ShardRAFT demo is already running:
+
+    make demo-down
+    make demo
+
+For container status and logs:
+
+    docker compose ps
+    docker compose logs
+
+---
 ## Project Highlights
 
 | Metric | Result |
@@ -683,6 +770,14 @@ state machine rather than a global cross-shard transaction.
 
 ## Getting Started
 
+For the simplest evaluator setup, use the Docker-only workflow:
+
+    make demo
+
+Then open `http://127.0.0.1:18080`.
+
+The prerequisites and commands below are intended for contributors who want to build, test, or modify ShardRAFT directly.
+
 ### Prerequisites
 
 - Go version specified in go.mod.
@@ -720,6 +815,12 @@ the Makefile.
 ---
 
 ## Docker Deployment
+
+For the complete evaluator deployment, including the production web dashboard, use:
+
+    make demo
+
+The lower-level Docker Compose commands below are useful for development, debugging, and direct service inspection.
 
 The recommended way to run the physical multi-Raft
 database is through Docker Compose.

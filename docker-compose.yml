@@ -147,6 +147,32 @@ services:
     ports:
       - "127.0.0.1:18085:8080"
 
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: shardraft-frontend:local
+    restart: unless-stopped
+    networks:
+      - shardraft
+    depends_on:
+      n1:
+        condition: service_healthy
+      n2:
+        condition: service_healthy
+      n3:
+        condition: service_healthy
+      n4:
+        condition: service_healthy
+      n5:
+        condition: service_healthy
+      gateway1:
+        condition: service_started
+      gateway2:
+        condition: service_started
+    ports:
+      - "127.0.0.1:18080:8080"
+
   gateway1:
     <<: *gateway-defaults
     hostname: gateway1
