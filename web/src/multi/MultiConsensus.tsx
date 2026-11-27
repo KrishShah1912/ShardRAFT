@@ -17,6 +17,12 @@ import type {
   DataShardID,
 } from "../api/multiDiagnostics";
 
+import { MultiLiveTopology } from "./MultiLiveTopology";
+import { MultiElectionTelemetry } from "./MultiElectionTelemetry";
+import type { MultiLiveTelemetry } from "./useMultiLiveTelemetry";
+
+import { MultiReplicationTelemetry } from "./MultiReplicationTelemetry";
+
 import "./multiConsensus.css";
 
 interface Props {
@@ -43,7 +49,10 @@ function Role({
   );
 }
 
-export function MultiCluster({ cluster }: Props) {
+export function MultiCluster({
+  cluster,
+  telemetry,
+}: Props & { telemetry: MultiLiveTelemetry }) {
   return (
     <section className="mc-page">
       <header className="page-header">
@@ -60,6 +69,16 @@ export function MultiCluster({ cluster }: Props) {
           </p>
         </div>
       </header>
+
+      <MultiLiveTopology
+        cluster={cluster}
+        telemetry={telemetry}
+      />
+
+      <MultiElectionTelemetry
+        cluster={cluster}
+        telemetry={telemetry}
+      />
 
       <div className="mc-node-grid">
         {STORAGE_NODE_IDS.map(id => {
@@ -272,7 +291,8 @@ export function MultiCluster({ cluster }: Props) {
 
 export function MultiReplication({
   cluster,
-}: Props) {
+  telemetry,
+}: Props & { telemetry: MultiLiveTelemetry }) {
   const [selectedShard, setSelectedShard] =
     useState<DataShardID>(1);
 
@@ -324,6 +344,12 @@ export function MultiReplication({
           </button>
         ))}
       </div>
+
+      <MultiReplicationTelemetry
+        cluster={cluster}
+        telemetry={telemetry}
+        selectedShard={selectedShard}
+      />
 
       <div className="ma-stat-grid">
         {[

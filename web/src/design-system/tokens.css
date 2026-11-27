@@ -1,0 +1,105 @@
+.multi-app {
+  /* Core surfaces */
+  --sr-canvas: #080d14;
+  --sr-sidebar: #0c121b;
+  --sr-surface: #101720;
+  --sr-elevated: #151f2c;
+  --sr-hover: #1a2635;
+
+  /* Borders */
+  --sr-border: #263244;
+  --sr-border-strong: #35445a;
+
+  /* Typography */
+  --sr-text: #e6edf7;
+  --sr-text-secondary: #a5b3c6;
+  --sr-text-muted: #8999af;
+
+  /* Semantic colors */
+  --sr-primary: #60a5fa;
+  --sr-success: #34d399;
+  --sr-warning: #fbbf24;
+  --sr-danger: #f87171;
+  --sr-replication: #a78bfa;
+  --sr-heartbeat: #22d3ee;
+  --sr-neutral: #94a3b8;
+
+  /* Raft roles */
+  --sr-leader: var(--sr-primary);
+  --sr-follower: var(--sr-success);
+  --sr-candidate: var(--sr-warning);
+  --sr-unavailable: var(--sr-danger);
+
+  /* Shard identity */
+  --sr-shard-1: #60a5fa;
+  --sr-shard-2: #2dd4bf;
+  --sr-shard-3: #a78bfa;
+  --sr-shard-4: #fbbf24;
+  --sr-metadata: #94a3b8;
+
+  /* Semantic surfaces */
+  --sr-primary-soft: rgba(96, 165, 250, .10);
+  --sr-success-soft: rgba(52, 211, 153, .10);
+  --sr-warning-soft: rgba(251, 191, 36, .10);
+  --sr-danger-soft: rgba(248, 113, 113, .10);
+
+  /* Spacing */
+  --sr-space-1: 4px;
+  --sr-space-2: 8px;
+  --sr-space-3: 12px;
+  --sr-space-4: 16px;
+  --sr-space-5: 20px;
+  --sr-space-6: 24px;
+  --sr-space-8: 32px;
+
+  /* Geometry */
+  --sr-radius-sm: 4px;
+  --sr-radius-md: 6px;
+  --sr-radius-lg: 10px;
+
+  /* Typography */
+  --sr-font-sans: Inter, ui-sans-serif, system-ui,
+    -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+
+  --sr-font-mono: "SFMono-Regular", Consolas,
+    "Liberation Mono", monospace;
+
+  --sr-font-xs: 11px;
+  --sr-font-sm: 12px;
+  --sr-font-base: 13px;
+  --sr-font-md: 14px;
+  --sr-font-lg: 18px;
+  --sr-font-xl: 24px;
+
+  /* Motion */
+  --sr-motion-fast: 120ms;
+  --sr-motion-normal: 220ms;
+  --sr-motion-slow: 400ms;
+  --sr-motion-packet: 2000ms;
+  --sr-motion-ease: cubic-bezier(.2, .8, .2, 1);
+
+  /* Existing frontend compatibility */
+  --bg: var(--sr-canvas);
+  --sidebar: var(--sr-sidebar);
+  --panel: var(--sr-surface);
+  --panel-hover: var(--sr-hover);
+  --border: var(--sr-border);
+  --border-light: var(--sr-border-strong);
+  --muted: var(--sr-text-muted);
+  --text: var(--sr-text);
+  --text-secondary: var(--sr-text-secondary);
+  --accent: var(--sr-primary);
+  --accent-soft: var(--sr-primary-soft);
+  --green: var(--sr-success);
+  --green-soft: var(--sr-success-soft);
+  --amber: var(--sr-warning);
+  --red: var(--sr-danger);
+
+  min-height: 100vh;
+  background: var(--sr-canvas);
+  color: var(--sr-text);
+  font-family: var(--sr-font-sans);
+  font-size: var(--sr-font-base);
+  color-scheme: dark;
+}

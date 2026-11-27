@@ -1,0 +1,148 @@
+.mec-panel {
+  padding: 18px;
+  margin: 18px 0;
+  border: 1px solid #263244;
+  border-radius: 12px;
+  background: #0d131d;
+}
+
+.mec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.mec-header h3 {
+  margin: 0 0 6px;
+}
+
+.mec-header p,
+.mec-note {
+  color: #94a3b8;
+  font-size: 12px;
+  margin: 0;
+}
+
+.mec-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mec-node {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 15px;
+  background: #111827;
+}
+
+.mec-node.mec-leader {
+  border-color: #34d399;
+  background: rgba(52, 211, 153, 0.045);
+}
+
+.mec-node.mec-offline {
+  border-color: #f87171;
+  background: rgba(248, 113, 113, 0.045);
+}
+
+.mec-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.mec-online-text {
+  color: #34d399;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.mec-offline-text {
+  color: #f87171;
+  font-size: 12px;
+}
+
+.mec-detail {
+  color: #94a3b8;
+  font-size: 12px;
+  margin: 6px 0;
+}
+
+.mec-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.mec-panel button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  border: 1px solid #334155;
+  background: #172131;
+  color: #e2e8f0;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mec-panel button.mec-stop {
+  border-color: #7f3540;
+  background: rgba(248, 113, 113, 0.08);
+  color: #f87171;
+}
+
+.mec-panel button.mec-start {
+  border-color: #26755d;
+  background: rgba(52, 211, 153, 0.08);
+  color: #34d399;
+}
+
+.mec-panel button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mec-panel button:not(:disabled):hover {
+  filter: brightness(1.3);
+}
+
+.mec-message {
+  padding: 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  margin-top: 14px;
+  color: #93c5fd;
+  font-size: 13px;
+}
+
+.mec-error,
+.mec-risk {
+  color: #fbbf24;
+}
+
+.mec-risk {
+  display: block;
+  margin-top: 10px;
+  font-size: 11px;
+}
+
+.mec-note {
+  margin-top: 14px;
+  line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+  .mec-grid {
+    grid-template-columns: 1fr;
+  }
+}

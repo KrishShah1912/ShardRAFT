@@ -1,0 +1,415 @@
+.mfc-panel {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.mfc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mfc-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 7px 0;
+}
+
+.mfc-header h2 svg,
+.mfc-section-heading h3 svg {
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.mfc-header p,
+.mfc-footer {
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.mfc-fixed-label {
+  padding: 6px 10px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.mfc-action {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid #26364b;
+  border-radius: 9px;
+  background: #111e2e;
+}
+
+.mfc-action > div,
+.mfc-metric {
+  display: grid;
+  gap: 8px;
+}
+
+.mfc-action small,
+.mfc-metric small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.mfc-action strong {
+  color: #e2e8f0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.mfc-group-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mfc-group-selector button {
+  min-width: 85px;
+}
+
+.mfc-group-selector .mfc-active-group {
+  border-color: #60a5fa !important;
+  color: #93c5fd !important;
+  background: #172b45 !important;
+}
+
+.mfc-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mfc-metric {
+  padding: 14px;
+  border: 1px solid #26364b;
+  border-radius: 9px;
+  background: #0f1928;
+}
+
+.mfc-metric strong {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #e2e8f0;
+  font-size: 23px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mfc-metric strong svg {
+  color: #64748b;
+}
+
+.mfc-metric > span {
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.mfc-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.mfc-snapshot {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  min-width: 0;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #0f1928;
+}
+
+.mfc-snapshot-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mfc-snapshot-heading > span {
+  color: #94a3b8;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.mfc-snapshot-heading small {
+  font-size: 10px;
+}
+
+.mfc-leader {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #162235;
+}
+
+.mfc-leader svg {
+  color: #fbbf24;
+}
+
+.mfc-leader > div {
+  display: grid;
+  gap: 5px;
+}
+
+.mfc-leader small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.mfc-leader strong {
+  color: #e2e8f0;
+  font-size: 24px;
+}
+
+.mfc-fields {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.mfc-fields > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #26364b;
+}
+
+.mfc-fields dt {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.mfc-fields dd {
+  margin: 0;
+  color: #e2e8f0;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.mfc-snapshot-time {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.mfc-good {
+  color: #34d399 !important;
+}
+
+.mfc-bad {
+  color: #f87171 !important;
+}
+
+.mfc-neutral {
+  color: #94a3b8 !important;
+}
+
+.mfc-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.mfc-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mfc-section-heading h3,
+.mfc-section-heading > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mfc-section-heading h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.mfc-section-heading > span {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mfc-delta {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.mfc-replica-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mfc-replica {
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid #26364b;
+  border-radius: 9px;
+  background: #0f1928;
+}
+
+.mfc-replica header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mfc-replica header strong {
+  color: #e2e8f0;
+  font-size: 14px;
+}
+
+.mfc-replica header span {
+  font-size: 10px;
+}
+
+.mfc-role-change {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 10px;
+  border-radius: 6px;
+  background: #172335;
+  color: #a5b4fc;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.mfc-catch-up {
+  display: grid;
+  gap: 7px;
+  padding: 11px;
+  border: 1px solid #334155;
+  border-radius: 7px;
+  background: #111e2e;
+}
+
+.mfc-catch-up small {
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.mfc-catch-up strong {
+  font-size: 12px;
+}
+
+.mfc-empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  min-height: 190px;
+  padding: 25px;
+  border: 1px dashed #334155;
+  border-radius: 9px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mfc-empty strong {
+  color: #e2e8f0;
+  font-size: 14px;
+}
+
+.mfc-notice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid #fbbf2440;
+  border-radius: 7px;
+  background: #fbbf2409;
+  color: #fbbf24;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.mfc-notice svg {
+  flex-shrink: 0;
+}
+
+.mfc-raw summary {
+  color: #60a5fa;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mfc-raw pre {
+  max-height: 350px;
+  overflow: auto;
+  padding: 14px;
+  border-radius: 7px;
+  background: #080f1a;
+  color: #a5b4fc;
+  font-size: 11px;
+}
+
+.mfc-footer {
+  padding-top: 12px;
+  border-top: 1px solid #26364b;
+  font-size: 11px;
+}
+
+@media (max-width: 1200px) {
+  .mfc-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mfc-replica-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .mfc-header {
+    flex-direction: column;
+  }
+
+  .mfc-action,
+  .mfc-snapshot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mfc-metric strong {
+    font-size: 18px;
+  }
+}

@@ -1,13 +1,17 @@
+import MultiEventInspector from "./MultiEventInspector";
+import { ChartHover } from "./ChartHover";
+import { MultiLiveMetrics } from "./MultiLiveMetrics";
+import type { MultiLiveTelemetry } from "./useMultiLiveTelemetry";
+
 import {
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
 import {
   getShardDiagnostic,
-  getMultiEventHistory,
   type DataShardID,
-  type MultiRaftEvent,
 } from "../api/multiDiagnostics";
 
 import {
@@ -23,6 +27,12 @@ import {
 import type {
   MultiRaftClusterState,
 } from "./useMultiRaftCluster";
+
+import {
+  eventIdentity,
+  LIVE_EVENT_TYPES,
+  type LiveEvent,
+} from "./liveTelemetry";
 
 import "./multiTelemetry.css";
 
@@ -503,17 +513,34 @@ function HistoryChart({
   const width = 800;
   const height = 200;
 
-  function points(
-    field: "reachable" | "leaders" | "majorities",
-  ) {
-    return samples.map((sample, index) => {
-      const x = 40 + index /
-        Math.max(1, samples.length - 1) * 740;
+  const series = [
+    {
+      field: "reachable" as const,
+      color: "#60a5fa",
+      strokeWidth: 2.5,
+      dash: undefined,
+    },
+    {
+      field: "majorities" as const,
+      color: "#2dd4bf",
+      strokeWidth: 4,
+      dash: undefined,
+    },
+    {
+      field: "leaders" as const,
+      color: "#fbbf24",
+      strokeWidth: 2.5,
+      dash: "8 6",
+    },
+  ];
 
-      const y = 175 - sample[field] / 5 * 150;
+  function x(index: number) {
+    return 40 + index /
+      Math.max(1, samples.length - 1) * 740;
+  }
 
-      return `${x},${y}`;
-    }).join(" ");
+  function y(value: number) {
+    return 175 - value / 5 * 150;
   }
 
   return (
@@ -523,78 +550,91 @@ function HistoryChart({
       role="img"
       aria-label="Recent cluster observation history"
     >
-      {[0, 1, 2, 3, 4, 5].map(value => {
-        const y = 175 - value / 5 * 150;
-
-        return (
-          <g key={value}>
-            <line
-              x1="40"
-              x2="780"
-              y1={y}
-              y2={y}
-              stroke="currentColor"
-              opacity=".1"
-            />
-
-            <text
-              x="20"
-              y={y + 4}
-              fill="currentColor"
-              fontSize="11"
-            >
-              {value}
-            </text>
-          </g>
-        );
-      })}
-
-      {[
-        {
-          field: "reachable" as const,
-          color: "#60a5fa",
-        },
-        {
-          field: "leaders" as const,
-          color: "#fbbf24",
-        },
-        {
-          field: "majorities" as const,
-          color: "#2dd4bf",
-        },
-      ].map(series => (
-        <g key={series.field}>
-          <polyline
-            points={points(series.field)}
-            fill="none"
-            stroke={series.color}
-            strokeWidth="2"
-            strokeLinejoin="round"
+      {[0, 1, 2, 3, 4, 5].map(value => (
+        <g key={value}>
+          <line
+            x1="40"
+            x2="780"
+            y1={y(value)}
+            y2={y(value)}
+            stroke="currentColor"
+            opacity=".1"
           />
 
-          {samples.map((sample, index) => (
-            <circle
-              key={sample.timestamp}
-              cx={
-                40 + index /
-                Math.max(1, samples.length - 1) * 740
-              }
-              cy={
-                175 - sample[series.field] / 5 * 150
-              }
-              r="2.5"
-              fill={series.color}
-            />
-          ))}
+          <text
+            x="20"
+            y={y(value) + 4}
+            fill="currentColor"
+            fontSize="11"
+          >
+            {value}
+          </text>
         </g>
       ))}
+
+      {series.map(item => (
+        <g key={item.field}>
+          <polyline
+            points={samples.map((sample, index) =>
+              `${x(index)},${y(sample[item.field])}`
+            ).join(" ")}
+            fill="none"
+            stroke={item.color}
+            strokeWidth={item.strokeWidth}
+            strokeDasharray={item.dash}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+
+          {samples.length === 1 && (
+            <circle
+              cx={x(0)}
+              cy={y(samples[0][item.field])}
+              r={item.field === "majorities" ? 4 : 2}
+              fill={item.color}
+            />
+          )}
+        </g>
+      ))}
+    <ChartHover
+        points={samples.map((sample, index) => ({
+          timestamp: sample.timestamp,
+          x: x(index),
+          values: [
+            {
+              label: "Reachable nodes",
+              value: sample.reachable,
+              color: "#60a5fa",
+              y: y(sample.reachable),
+            },
+            {
+              label: "Observed leaders",
+              value: sample.leaders,
+              color: "#fbbf24",
+              y: y(sample.leaders),
+            },
+            {
+              label: "Reachable majorities",
+              value: sample.majorities,
+              color: "#2dd4bf",
+              y: y(sample.majorities),
+            },
+          ],
+        }))}
+        left={40}
+        right={780}
+        top={25}
+        bottom={175}
+        width={width}
+      />
     </svg>
   );
 }
 
 export function MultiMetrics({
   cluster,
-}: Props) {
+  telemetry,
+}: Props & { telemetry: MultiLiveTelemetry }) {
   const [samples, setSamples] =
     useState<MetricSample[]>([]);
 
@@ -648,6 +688,8 @@ export function MultiMetrics({
         title="Metrics"
         description="Live cluster observations and per-shard consensus counters."
       />
+
+      <MultiLiveMetrics telemetry={telemetry} />
 
       <Stats
         items={[
@@ -817,149 +859,190 @@ export function MultiMetrics({
   );
 }
 
-function eventIdentity(event: MultiRaftEvent) {
-  return [
-    event.node_id,
-    event.id,
-    event.timestamp,
-  ].join(":");
-}
+export function MultiEvents({
+  telemetry,
+}: {
+  telemetry: MultiLiveTelemetry;
+}) {
+  const [pausedEvents, setPausedEvents] =
+    useState<LiveEvent[] | null>(null);
 
-export function MultiEvents() {
-  const [events, setEvents] =
-    useState<MultiRaftEvent[]>([]);
+  const [clearedAt, setClearedAt] =
+    useState<number | null>(null);
 
-  const [errors, setErrors] =
-    useState<string[]>([]);
+  const [inspection, setInspection] = useState<{
+    event: LiveEvent;
+    events: LiveEvent[];
+  } | null>(null);
 
-  const [paused, setPaused] = useState(false);
   const [node, setNode] = useState("all");
   const [shard, setShard] = useState("all");
   const [category, setCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(100);
-  const [updated, setUpdated] = useState("");
+  const [quickFilter, setQuickFilter] = useState("all");
+  const [eventType, setEventType] = useState("all");
+  const [term, setTerm] = useState("");
+  const [requestId, setRequestId] = useState("");
 
-  useEffect(() => {
-    if (paused) return;
+  const quickFilters = [
+    ["all", "All events"],
+    ["consensus", "Consensus"],
+    ["elections", "Elections"],
+    ["replication", "Replication"],
+    ["commits", "Commits"],
+    ["heartbeats", "Heartbeats"],
+    ["transport", "Transport"],
+  ] as const;
 
-    let active = true;
-    let busy = false;
+  const paused = pausedEvents !== null;
 
-    async function poll() {
-      if (!active || busy) return;
+  const sharedEvents = useMemo(() => {
+    const merged = new Map<string, LiveEvent>();
 
-      busy = true;
-
-      try {
-        const results = await Promise.allSettled(
-          STORAGE_NODE_IDS.map(
-            async id => ({
-              node: id,
-              history: await getMultiEventHistory(id),
-            }),
-          ),
-        );
-
-        if (!active) return;
-
-        const incoming: MultiRaftEvent[] = [];
-        const warnings: string[] = [];
-
-        results.forEach((result, index) => {
-          if (result.status === "fulfilled") {
-            const { node, history } = result.value;
-
-            if (!Array.isArray(history.events)) {
-              warnings.push(
-                `Node ${node}: invalid event history`,
-              );
-              return;
-            }
-
-            incoming.push(
-              ...history.events.filter(
-                event => event.node_id === node,
-              ),
-            );
-          } else {
-            warnings.push(
-              `Node ${STORAGE_NODE_IDS[index]}: ` +
-              String(result.reason),
-            );
-          }
-        });
-
-        setErrors(warnings);
-
-        if (incoming.length > 0) {
-          setEvents(previous => {
-            const merged = new Map(
-              previous.map(event => [
-                eventIdentity(event),
-                event,
-              ]),
-            );
-
-            for (const event of incoming) {
-              merged.set(
-                eventIdentity(event),
-                event,
-              );
-            }
-
-            return Array.from(merged.values())
-              .sort((a, b) =>
-                b.timestamp.localeCompare(
-                  a.timestamp,
-                ) || b.id - a.id,
-              )
-              .slice(0, 5000);
-          });
-        }
-
-        if (warnings.length < STORAGE_NODE_IDS.length) {
-          setUpdated(new Date().toISOString());
-        }
-      } finally {
-        busy = false;
-      }
+    for (const event of [
+      ...telemetry.events,
+      ...telemetry.electionEvents,
+      ...telemetry.replicationEvents,
+    ]) {
+      merged.set(eventIdentity(event), event);
     }
 
-    void poll();
+    return [...merged.values()].sort(
+      (a, b) =>
+        Date.parse(b.timestamp) -
+          Date.parse(a.timestamp) ||
+        b.timestamp.localeCompare(a.timestamp) ||
+        b.id - a.id ||
+        b.node_id - a.node_id,
+    );
+  }, [
+    telemetry.events,
+    telemetry.electionEvents,
+    telemetry.replicationEvents,
+  ]);
 
-    const timer = window.setInterval(
-      () => void poll(),
-      3000,
+  const sourceEvents =
+    pausedEvents ?? sharedEvents;
+
+  const events = useMemo(
+    () => sourceEvents.filter(event =>
+      clearedAt === null ||
+      Date.parse(event.timestamp) > clearedAt
+    ),
+    [sourceEvents, clearedAt],
+  );
+
+  const updated = events[0]?.timestamp ?? "";
+
+  const errors = telemetry.streams
+    .filter(stream => stream.status !== "connected")
+    .map(stream =>
+      `Node ${stream.nodeId}: ${stream.status}`
     );
 
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
-  }, [paused]);
+  function togglePause() {
+    if (paused) {
+      setPausedEvents(null);
+    } else {
+      setPausedEvents([...events]);
+    }
+  }
+
+  function clearHistory() {
+    setInspection(null);
+    setClearedAt(Date.now());
+    setLimit(100);
+
+    if (paused) {
+      setPausedEvents([]);
+    }
+  }
 
   const categories = Array.from(
     new Set(events.map(event => event.category)),
   ).sort();
 
+  const eventTypes = useMemo(
+    () => Array.from(new Set([
+      ...LIVE_EVENT_TYPES,
+      ...events.map(event => event.type),
+    ])).sort(),
+    [events],
+  );
+
+  function matchesQuickFilter(event: LiveEvent) {
+    switch (quickFilter) {
+      case "consensus":
+        return event.category === "raft" &&
+          !event.type.startsWith("raft.heartbeat.");
+
+      case "elections":
+        return (
+          event.type.startsWith("raft.election.") ||
+          event.type.startsWith("raft.vote.") ||
+          event.type === "raft.leader.elected" ||
+          event.type === "raft.role.changed" ||
+          event.type === "raft.term.changed"
+        );
+
+      case "replication":
+        return (
+          event.type.startsWith("raft.append.") ||
+          event.type === "raft.entry.appended" ||
+          event.type === "raft.noop.appended" ||
+          event.type === "raft.replication.progress"
+        );
+
+      case "commits":
+        return event.type === "raft.commit.advanced";
+
+      case "heartbeats":
+        return event.type.startsWith("raft.heartbeat.");
+
+      case "transport":
+        return event.category === "transport";
+
+      default:
+        return true;
+    }
+  }
+
   const filtered = events.filter(event =>
+    matchesQuickFilter(event) &&
     (node === "all" ||
       String(event.node_id) === node) &&
     (shard === "all" ||
       String(event.shard_id) === shard) &&
     (category === "all" ||
       event.category === category) &&
-    (
-      !search.trim() ||
+    (eventType === "all" ||
+      event.type === eventType) &&
+    (!term.trim() ||
+      String(event.term ?? "") === term.trim()) &&
+    (!requestId.trim() ||
+      String(event.data.request_id ?? "") ===
+        requestId.trim()) &&
+    (!search.trim() ||
       JSON.stringify(event)
         .toLowerCase()
-        .includes(search.toLowerCase())
-    ),
+        .includes(search.trim().toLowerCase()))
   );
 
+  function resetFilters() {
+    setQuickFilter("all");
+    setNode("all");
+    setShard("all");
+    setCategory("all");
+    setEventType("all");
+    setTerm("");
+    setRequestId("");
+    setSearch("");
+    setLimit(100);
+  }
+
   return (
-    <section className="mt-page">
+    <section className="mt-page mt-events-page">
       <Header
         title="Events"
         description="Inspect observed Raft and transport events across the distributed deployment."
@@ -979,11 +1062,31 @@ export function MultiEvents() {
             label: "Collection state",
             value: paused
               ? "Paused"
-              : errors.length
-                ? "Partial"
-                : updated
-                  ? "Polling"
-                  : "Connecting",
+              : telemetry.connectedNodes === 5
+                ? "Live"
+                : telemetry.connectedNodes > 0
+                  ? "Partial"
+                  : "Disconnected / connecting",
+          },
+          {
+            label: "SSE streams",
+            value: `${telemetry.connectedNodes}/5`,
+          },
+          {
+            label: "Raft events",
+            value: events.filter(
+              event => event.category === "raft",
+            ).length,
+          },
+          {
+            label: "Transport events",
+            value: events.filter(
+              event => event.category === "transport",
+            ).length,
+          },
+          {
+            label: "Pending queue evictions",
+            value: telemetry.droppedEvents,
           },
         ]}
       />
@@ -994,17 +1097,37 @@ export function MultiEvents() {
 
           <div className="mt-controls">
             <button
-              onClick={() => setPaused(p => !p)}
+              onClick={togglePause}
             >
               {paused ? "Resume" : "Pause"}
             </button>
 
             <button
-              onClick={() => setEvents([])}
+              onClick={clearHistory}
             >
               Clear local history
             </button>
           </div>
+        </div>
+
+        <div className="mt-event-quick-filters">
+          {quickFilters.map(([value, label]) => (
+            <button
+              key={value}
+              className={
+                quickFilter === value
+                  ? "mt-event-quick-active"
+                  : ""
+              }
+              aria-pressed={quickFilter === value}
+              onClick={() => {
+                setQuickFilter(value);
+                setLimit(100);
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         <div className="mt-event-filters">
@@ -1071,6 +1194,54 @@ export function MultiEvents() {
           </label>
 
           <label>
+            Event type
+
+            <select
+              value={eventType}
+              onChange={event => {
+                setEventType(event.target.value);
+                setLimit(100);
+              }}
+            >
+              <option value="all">All event types</option>
+
+              {eventTypes.map(value => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Term
+
+            <input
+              inputMode="numeric"
+              value={term}
+              placeholder="Any term"
+              onChange={event => {
+                setTerm(event.target.value);
+                setLimit(100);
+              }}
+            />
+          </label>
+
+          <label>
+            Request ID
+
+            <input
+              inputMode="numeric"
+              value={requestId}
+              placeholder="Any request ID"
+              onChange={event => {
+                setRequestId(event.target.value);
+                setLimit(100);
+              }}
+            />
+          </label>
+
+          <label>
             Search
 
             <input
@@ -1084,17 +1255,29 @@ export function MultiEvents() {
           </label>
         </div>
 
+        <div className="mt-event-filter-footer">
+          <small>
+            {filtered.length.toLocaleString()} matching
+            {" / "}
+            {events.length.toLocaleString()} retained events
+          </small>
+
+          <button onClick={resetFilters}>
+            Reset filters
+          </button>
+        </div>
+
         <p>
-          Last successful collection:{" "}
+          Latest visible event:{" "}
           {formatTime(updated)}
           {" · "}
-          Up to 5,000 locally retained events
+          Combined bounded live and consensus histories
         </p>
 
         {errors.length > 0 && (
           <details className="mt-warning">
             <summary>
-              {errors.length} collection warning(s)
+              {errors.length} stream warning(s)
             </summary>
 
             {errors.map(error => (
@@ -1103,6 +1286,15 @@ export function MultiEvents() {
           </details>
         )}
       </article>
+
+      {inspection && (
+        <MultiEventInspector
+          key={eventIdentity(inspection.event)}
+          event={inspection.event}
+          events={inspection.events}
+          onClose={() => setInspection(null)}
+        />
+      )}
 
       <article className="ma-panel">
         <h2>Event timeline</h2>
@@ -1145,17 +1337,17 @@ export function MultiEvents() {
                   <td>{event.term ?? "—"}</td>
 
                   <td>
-                    <details>
-                      <summary>Inspect</summary>
-
-                      <pre className="mt-json">
-                        {JSON.stringify(
+                    <button
+                      className="mei-inspect-button"
+                      onClick={() => {
+                        setInspection({
                           event,
-                          null,
-                          2,
-                        )}
-                      </pre>
-                    </details>
+                          events: [...events],
+                        });
+                      }}
+                    >
+                      Inspect
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -1184,11 +1376,20 @@ export function MultiEvents() {
         </div>
 
         <p>
-          This timeline uses bounded backend event
-          histories. Events may be missed between
-          polls. Metadata-group events are not
-          currently exposed. Clearing local history
-          does not clear backend history.
+          This timeline uses the shared live SSE
+          event buffer. Collection is bounded and
+          best-effort, not a lossless audit log.
+          Metadata-group events are not included.
+          Pause freezes this page only. Resume returns
+          to the current shared buffer. Clear hides
+          events through the local clear timestamp
+          without deleting shared or backend history.
+          General, election and replication buffers
+          are merged and deduplicated. Queue evictions
+          count pending-buffer removals across these
+          buffers, not unique lost events. Request IDs
+          are not globally unique across nodes, shards
+          and terms. All filters are combined.
         </p>
       </article>
     </section>

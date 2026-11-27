@@ -1,0 +1,246 @@
+.mtp-panel {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.mtp-heading,
+.mtp-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mtp-heading h2 {
+  margin: 6px 0;
+}
+
+.mtp-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.mtp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mtp-tabs button,
+.mtp-inspector button {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text-secondary);
+  padding: 9px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.mtp-tabs button.active {
+  color: #60a5fa;
+  border-color: #60a5fa;
+  background: rgba(96, 165, 250, .08);
+}
+
+.mtp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+
+.mtp-graph {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 12px;
+  overflow: auto;
+}
+
+.mtp-graph svg {
+  display: block;
+  width: 100%;
+  min-width: 560px;
+  max-height: 550px;
+}
+
+.mtp-node {
+  cursor: pointer;
+  outline: none;
+}
+
+.mtp-node-bg {
+  fill: var(--panel);
+}
+
+.mtp-node:hover .mtp-node-bg,
+.mtp-node:focus-visible .mtp-node-bg {
+  stroke: #60a5fa;
+  stroke-width: 3;
+}
+
+.mtp-packet {
+  opacity: 0;
+  offset-distance: 0%;
+  filter: drop-shadow(0 0 5px currentColor);
+  animation: mtp-travel 2000ms linear both;
+  pointer-events: none;
+}
+
+.mtp-active-path {
+  animation: mtp-flow 2400ms linear infinite;
+}
+
+@keyframes mtp-travel {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+
+  10%, 85% {
+    opacity: 1;
+  }
+
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes mtp-flow {
+  from {
+    stroke-dashoffset: 15;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.mtp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px;
+}
+
+.mtp-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.mtp-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.mtp-group-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mtp-group-card {
+  display: grid;
+  text-align: left;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid;
+  border-radius: 9px;
+  background: var(--panel-hover);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.mtp-group-card span,
+.mtp-group-card small {
+  font-size: 11px;
+}
+
+.mtp-group-card strong {
+  font-size: 13px;
+}
+
+.mtp-group-card small {
+  color: var(--muted);
+}
+
+.mtp-inspector {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.mtp-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mtp-details > div {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  background: var(--panel-hover);
+  border-radius: 7px;
+}
+
+.mtp-details span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.mtp-details strong {
+  font-size: 14px;
+}
+
+.mtp-table-wrap {
+  overflow-x: auto;
+}
+
+.mtp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.mtp-table td,
+.mtp-table th {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mtp-table th,
+.mtp-note {
+  color: var(--muted);
+}
+
+.mtp-note {
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1100px) {
+  .mtp-group-grid,
+  .mtp-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mtp-packet {
+    display: none;
+  }
+
+  .mtp-active-path {
+    animation: none;
+  }
+}

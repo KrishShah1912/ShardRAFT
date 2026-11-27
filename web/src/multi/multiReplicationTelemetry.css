@@ -1,0 +1,334 @@
+.mrt-panel {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.mrt-header,
+.mrt-toolbar,
+.mrt-replica-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mrt-header {
+  flex-wrap: wrap;
+}
+
+.mrt-header h2 {
+  margin: 6px 0;
+}
+
+.mrt-header p,
+.mrt-note {
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.mrt-eyebrow {
+  color: #38bdf8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.mrt-connection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.mrt-connection i {
+  width: 8px;
+  height: 8px;
+  background: #fbbf24;
+  border-radius: 50%;
+}
+
+.mrt-connection i.online {
+  background: #34d399;
+  box-shadow: 0 0 12px #34d399;
+}
+
+.mrt-toolbar {
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border: 1px solid #253449;
+  background: #0c1522;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.mrt-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e2e8f0;
+}
+
+.mrt-toolbar input {
+  accent-color: #38bdf8;
+}
+
+.mrt-stats {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(135px, 1fr));
+  gap: 10px;
+}
+
+.mrt-stat,
+.mrt-replica {
+  padding: 16px;
+  background: #111b29;
+  border: 1px solid #29384c;
+  border-radius: 10px;
+}
+
+.mrt-stat span,
+.mrt-replica small,
+.mrt-commit small {
+  display: block;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.mrt-stat strong {
+  display: block;
+  margin-top: 9px;
+  color: #e2e8f0;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mrt-canvas {
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse at 50% 10%,
+      #11243b,
+      #080e18 70%
+    );
+  border: 1px solid #29384c;
+  border-radius: 14px;
+}
+
+.mrt-canvas svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 280px;
+}
+
+.mrt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.mrt-legend span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  text-transform: capitalize;
+}
+
+.mrt-legend i,
+.mrt-event i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mrt-quorum-flash {
+  animation: mrt-commit-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes mrt-commit-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px #10b98144);
+  }
+  50% {
+    filter: drop-shadow(0 0 14px #10b981bb);
+  }
+}
+
+.mrt-panel h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.mrt-replicas {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.mrt-replica-heading {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.mrt-replica-heading strong {
+  font-size: 15px;
+  color: #e2e8f0;
+}
+
+.mrt-replica small {
+  margin-top: 20px;
+}
+
+.mrt-progress {
+  height: 8px;
+  margin: 9px 0;
+  background: #263449;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mrt-progress > div {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    #0284c7,
+    #34d399
+  );
+  border-radius: 8px;
+  transition: width 800ms ease;
+}
+
+.mrt-commit {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  background: #0c211f;
+  border: 1px solid #16634e;
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.mrt-commit strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 21px;
+  color: #6ee7b7;
+}
+
+.mrt-request-table {
+  max-height: 380px;
+  overflow: auto;
+}
+
+.mrt-stage {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mrt-timeline {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid #29384c;
+  border-radius: 10px;
+  background: #090f19;
+}
+
+.mrt-event {
+  display: grid;
+  grid-template-columns:
+    8px 85px 65px 155px minmax(150px, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid #1e293b;
+  font-size: 11px;
+  min-width: 560px;
+}
+
+.mrt-event i {
+  background: #38bdf8;
+  box-shadow: 0 0 7px #38bdf866;
+}
+
+.mrt-event i.commit {
+  background: #34d399;
+}
+
+.mrt-event i.rejected {
+  background: #f87171;
+}
+
+.mrt-event time,
+.mrt-event code {
+  color: #94a3b8;
+}
+
+.mrt-event code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mrt-timeline > p {
+  padding: 16px;
+  color: #94a3b8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mrt-quorum-flash {
+    animation: none;
+  }
+
+  .mrt-progress > div {
+    transition: none;
+  }
+}
+
+/* Event-driven replication packet motion */
+.mrt-motion-packet {
+  offset-distance: 0%;
+  opacity: 0;
+  pointer-events: none;
+  animation: mrt-packet-travel 2600ms linear both;
+}
+
+@keyframes mrt-packet-travel {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mrt-motion-packet {
+    display: none;
+    animation: none;
+  }
+}

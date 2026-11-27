@@ -950,8 +950,8 @@ supporting both development and physical Multi-Raft deployments.
 
 | Mode | URL | Backend |
 |---|---|---|
-| Development | http://127.0.0.1:5173/ | Three-node local development cluster |
-| Multi-Raft | http://127.0.0.1:5173/?mode=multi | Five storage nodes and two Docker gateways |
+| Development (legacy) | http://127.0.0.1:5173/?mode=legacy | Three-node local development cluster |
+| Multi-Raft (default) | http://127.0.0.1:5173/ | Five storage nodes and two Docker gateways |
 
 The sidebar provides navigation between the two modes.
 Each mode requires its corresponding backend services.
@@ -1004,10 +1004,126 @@ storage nodes, gateways, and Docker control service.
 | Transport | Per-peer gRPC transport statistics | Live |
 | Shards | Slot ownership, metadata and key-routing preview | Live and computed |
 | Metrics | Cluster observations and replication progress | Live sampled observations |
-| Events | Shard-tagged event history and filtering | Live bounded polling |
+| Events | Shard-tagged event history, filtering and inspection | Live bounded SSE telemetry |
 | Test Lab | Recorded correctness and validation evidence | Historical |
 | Fault Lab | Docker stop, start, restart and leadership transitions | Live |
 | Performance Lab | Throughput, latency, fault and WAL measurements | Historical |
+
+### Live Telemetry and Interactive Demonstration
+
+Multi-Raft is the default dashboard mode.
+
+- Multi-Raft: http://127.0.0.1:5173/
+- Explicit Multi-Raft: http://127.0.0.1:5173/?mode=multi
+- Original development mode: http://127.0.0.1:5173/?mode=legacy
+
+The dashboard includes a dedicated design system, grouped navigation,
+live workspace status, cluster health indicators, and interactive
+physical and logical topology views.
+
+#### Live Observability
+
+- Shared Server-Sent Events (SSE) connections to five storage nodes.
+- Live heartbeat, election, and AppendEntries visualizations.
+- Shard-specific leader, term, commit, and applied-index observations.
+- Live metrics, bounded event history, filtering, and event inspection.
+- Independent cluster status and Docker control polling.
+
+Visualizations distinguish observed protocol events from configured
+topology and sampled cluster state. They are not a lossless distributed
+trace or a precise network-latency measurement.
+
+#### Interactive Architecture
+
+- Logical client, gateway, metadata, and shard architecture.
+- Physical deployment and replica placement.
+- Interactive CRC32 request-routing preview.
+- Live consensus and replication visualization.
+- Persistent storage, WAL, and snapshot diagnostics.
+- Section navigation and visualization motion controls.
+
+#### Live Workload Demonstration
+
+The Architecture page includes a configurable sequential PUT workload
+using the actual HTTP gateways.
+
+- Select one of four data shards.
+- Select 5, 10, 15, or 20 operations.
+- Configure the interval between operations.
+- Generate unique keys mapped to the selected shard.
+- Display operation status, latency, progress, and gateway results.
+- Stop future operations and inspect completed requests.
+- Halt execution when a mutation outcome becomes uncertain.
+
+Workload results and Raft telemetry are displayed together, but
+temporal proximity does not prove exact per-request event correlation.
+
+#### Advanced Fault Injection Lab
+
+- Interactive physical topology and projected node-stop impact.
+- Shared quorum assessment across Fault Lab and election controls.
+- Conservative protection against actions that would remove a
+  configured group's observed reachable majority.
+- Shared frontend action coordination across fault-control panels.
+- Unified timeline of Docker actions, elections, leadership changes,
+  replication events, and reachability observations.
+- Immutable before-and-after cluster snapshots.
+- Per-group leader, term, commit, applied-index, and replica comparisons.
+
+The action guard is based on recent observations and is not a
+distributed safety guarantee. Coordination is local to the current
+frontend instance. External Docker commands and other browser sessions
+are outside its authority.
+
+Snapshot comparisons are independently sampled observations, not
+atomic distributed snapshots or proof of identical replica contents.
+
+#### Frontend Bundle Optimization
+
+Ten secondary page components use React lazy loading and Suspense.
+Query Console and Fault Lab remain persistently mounted during page
+navigation. Cluster polling and shared SSE connections remain at the
+workspace level.
+
+| Metric | Before | After |
+|---|---:|---:|
+| Largest JavaScript chunk | 638.74 kB | 281.74 kB |
+| Main CSS bundle | 207.59 kB | 144.44 kB |
+| JavaScript chunks | 1 | 9 |
+| Chunks above 500 kB | 1 | 0 |
+
+The largest JavaScript chunk decreased by 55.89%.
+The React framework is separated into a 221.27 kB vendor chunk.
+
+Total generated JavaScript is 642.32 kB. Code splitting improves
+deferred loading and independent caching rather than reducing the
+total generated JavaScript size.
+
+#### Latest Focused Validation
+
+| Validation | Result |
+|---|---|
+| Workload generation and execution tests | 35/35 passed |
+| Quorum protection tests | 24/24 passed |
+| Availability combinations evaluated | 160 |
+| Fault timeline tests | 34/34 passed |
+| Fault snapshot tests | 41/41 passed |
+| Combined fault regression suite | 99/99 passed |
+| TypeScript production compilation | Passed |
+| Production build | Passed |
+| Production build chunk-size warnings | 0 |
+| Production dashboard navigation | Manually confirmed |
+| Final observed storage health | 5/5 healthy |
+
+The focused test counts overlap with the combined fault regression
+suite and must not be added together as unique tests.
+
+These results supplement the previously recorded browser and backend
+validation. The complete distributed evaluation suite was not rerun
+for this frontend enhancement.
+
+See [Multi-Raft Frontend and Demonstration Guide](docs/MULTI_RAFT_FRONTEND.md)
+for deployment, demonstration instructions, and limitations.
 
 ### Query Console
 
@@ -1072,7 +1188,7 @@ cd ..
 make dev
 ```
 
-Open http://127.0.0.1:5173/.
+Open http://127.0.0.1:5173/?mode=legacy.
 
 The original development supervisor and three-node dashboard
 remain available.
@@ -1676,7 +1792,7 @@ The following limitations remain:
 - Query history and observed telemetry history are held in memory.
 - Local diagnostic reads may be stale and separate observations are not atomic.
 - Reachability-based majority indicators do not prove consensus availability.
-- Event polling is bounded and is not a lossless event stream.
+- SSE event delivery and client-side event retention are bounded and are not lossless distributed tracing.
 - Routing previews are not actual distributed request traces.
 - Multi-Raft Performance Lab and Test Lab display historical evidence rather than executing live benchmarks.
 - Browser gateway failure injection does not establish actual gateway process recovery.

@@ -11,6 +11,17 @@ const proxyTo = (prefix: string, port: number) => ({
 export default defineConfig({
   plugins: [react()],
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom", "react-dom/client"],
+        },
+      },
+    },
+  },
+
+
   server: {
     host: "127.0.0.1",
     port: 5173,

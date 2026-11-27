@@ -5,7 +5,8 @@
 The ShardRAFT Multi-Raft dashboard connects to the actual
 five-node distributed database through local HTTP interfaces.
 
-The original three-node development mode remains available.
+Multi-Raft is the default dashboard mode. The original three-node
+development mode remains available through `?mode=legacy`.
 
 ## Deployment
 
@@ -91,6 +92,25 @@ metadata group.
 Open Architecture to explain the client, gateway, metadata,
 Raft replication, and persistent storage layers.
 
+Use the section navigation to explore:
+
+- Logical architecture and live shard leadership.
+- Physical deployment and configured replica placement.
+- Interactive CRC32 request routing.
+- Live consensus and replication.
+- WAL, persistent storage, and snapshot diagnostics.
+
+The Architecture page also provides a live sequential PUT workload
+demonstration. Select a shard, operation count, and execution interval.
+
+The workload uses unique shard-targeted keys and actual gateway
+requests. Inspect progress, operation results, and live replication
+observations. Generated keys remain in the database unless explicitly
+deleted. Stop prevents future operations but does not undo writes.
+
+An uncertain mutation outcome stops the workload. Workload history
+is local to the mounted demonstration component.
+
 ### 2. Sharding and Metadata
 
 Open Shards and inspect the configured placement.
@@ -135,6 +155,16 @@ index, applied index, and configured replicas.
 
 Each data group elects its own leader independently.
 
+The live election visualization displays observed candidate activity,
+vote requests, responses, and leadership events by shard and term.
+
+The replication visualization displays observed AppendEntries
+requests, acknowledgements, rejections, and commit events.
+
+Animations represent retained protocol observations rather than
+exact packet travel times. Metadata leadership is observed through
+polling where equivalent live events are unavailable.
+
 ### 5. Persistent Storage
 
 Open Raft Log, Database, and Storage.
@@ -154,8 +184,13 @@ Open Transport, Metrics, and Events.
 Inspect peer communication statistics, sampled cluster
 observations, and shard-tagged event history.
 
-The event viewer uses bounded polling rather than a
-lossless distributed tracing system.
+The event viewer uses shared Server-Sent Events (SSE) connections
+to the five storage nodes. Cluster state and Docker service status
+are independently polled.
+
+The client retains bounded event history and supports filtering,
+pausing, inspection, and clearing the local event view. Event
+delivery is best effort rather than lossless distributed tracing.
 
 ### 7. Live Fault Injection
 
@@ -169,7 +204,25 @@ Before starting:
 - Prefer a data leader that is not the metadata leader.
 - Confirm no other fault experiment is running.
 
-In Fault Lab, stop one selected storage node.
+Fault Lab includes an interactive physical topology, projected
+quorum impact, shared action coordination, and a unified event
+timeline.
+
+Inspect the selected node's hosted groups and the projected
+remaining reachable replicas before any local control operation.
+
+The frontend blocks stop and restart actions when recent
+observations are unavailable or the projected reachable majority
+would be lost. These checks do not replace Raft's consensus rules.
+
+The Fault Lab records a before snapshot and attempts to capture
+a fresh after snapshot following each action. Compare observed
+leaders, terms, commit indexes, applied indexes, and replica
+reachability. Missing or stale observations are reported rather
+than treated as confirmed recovery.
+
+The before-and-after observation interval is not a precise
+failover or recovery duration.
 
 Observe the replacement leader and the remaining replicas.
 
@@ -257,6 +310,61 @@ Node 3 became leader, and the term increased from 4 to 5.
 These timings include control and polling overhead.
 They are not precise consensus-protocol latency measurements.
 
+## Frontend Production Build
+
+From the repository root:
+
+```bash
+cd web
+npm run build
+npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
+```
+
+Open http://127.0.0.1:4173/.
+
+The production build uses page-level lazy loading and a separate
+React framework chunk.
+
+| Asset | Generated size |
+|---|---:|
+| Main application | 281.74 kB |
+| React framework | 221.27 kB |
+| Architecture | 46.94 kB |
+| Telemetry | 32.48 kB |
+| Consensus | 19.47 kB |
+| Evaluation | 13.49 kB |
+| Replication telemetry | 9.82 kB |
+| Data diagnostics | 9.62 kB |
+| Shards | 7.49 kB |
+
+The largest JavaScript chunk decreased from 638.74 kB to
+281.74 kB, a reduction of 55.89%.
+
+All nine JavaScript chunks are below the default 500 kB warning
+threshold. Total generated JavaScript is 642.32 kB.
+
+Production page navigation was manually confirmed after optimization.
+
+## Focused Frontend Regression Results
+
+| Test area | Result |
+|---|---|
+| Workload generation | 17/17 passed |
+| Workload execution | 18/18 passed |
+| Quorum protection | 24/24 passed |
+| Fault timeline | 34/34 passed |
+| Fault snapshots | 41/41 passed |
+| Combined fault regression | 99/99 passed |
+| Production compilation and build | Passed |
+
+The quorum tests cover 160 availability combinations.
+The combined regression includes the quorum, timeline, and
+snapshot suites; these counts are not independent totals.
+
+These focused results supplement earlier browser and distributed
+evaluation evidence. They do not represent a new full-system
+distributed evaluation run.
+
 ## Troubleshooting
 
 ### Dashboard Cannot Reach Storage Nodes
@@ -305,8 +413,15 @@ Open the explicit Multi-Raft URL:
 
 http://127.0.0.1:5173/?mode=multi
 
-The original development mode uses the root URL and
-requires its separate development backend.
+Multi-Raft is also available at the root URL:
+
+http://127.0.0.1:5173/
+
+The original development mode uses:
+
+http://127.0.0.1:5173/?mode=legacy
+
+The original mode requires its separate development backend.
 
 ## Shutdown
 
@@ -328,7 +443,16 @@ Named storage volumes remain intact.
 - No multi-key distributed transactions.
 - Local diagnostics are not linearizable reads.
 - Reachability indicators are not proofs of quorum.
-- Event and metrics observations are bounded.
+- Event and metrics observations are bounded and best effort.
+- SSE delivery is not a lossless distributed trace.
+- Protocol animations do not measure exact network latency.
+- Snapshot comparisons are independently sampled and non-atomic.
+- Matching indexes do not prove identical replica contents.
+- Quorum protection relies on recent reachability observations.
+- Shared action coordination is local to one frontend instance.
+- External commands and other browser sessions can bypass frontend guards.
+- Live workload history is local and generated keys require cleanup.
+- Exact per-write correlation with Raft events is not guaranteed.
 - Unresolved mutations use same-tab session storage.
 - Query history and fault history are not persistent.
 - Historical evaluation pages do not launch live experiments.

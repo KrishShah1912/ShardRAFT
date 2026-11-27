@@ -230,7 +230,7 @@ export function Sidebar({
       </div>
       <a
         className="ma-mode-link"
-        href={mode === "multi" ? "/" : "/?mode=multi"}
+        href={mode === "multi" ? "/?mode=legacy" : "/"}
         onClick={event => {
           if (
             mode === "multi" &&

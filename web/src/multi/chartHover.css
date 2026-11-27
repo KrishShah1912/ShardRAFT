@@ -1,0 +1,19 @@
+.sr-chart-hover-target {
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+.sr-chart-hover-target:focus {
+  outline: none;
+}
+
+.sr-chart-hover-target:focus-visible {
+  stroke: #60a5fa;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.sr-chart-hover text {
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}

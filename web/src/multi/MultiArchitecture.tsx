@@ -1,28 +1,45 @@
+import { useState } from "react";
+import type { DataShardID } from "../api/multiDiagnostics";
+
+import { MultiArchitectureNavigation } from "./MultiArchitectureNavigation";
+import { MultiArchitectureStorage } from "./MultiArchitectureStorage";
+import { MultiArchitectureConsensus } from "./MultiArchitectureConsensus";
+import { MultiLiveWorkloadDemo } from "./MultiLiveWorkloadDemo";
+import { MultiRequestJourney } from "./MultiRequestJourney";
+import { MultiPhysicalDeployment } from "./MultiPhysicalDeployment";
+import { MultiArchitectureCanvas } from "./MultiArchitectureCanvas";
+
 import type {
   MultiRaftClusterState,
 } from "./useMultiRaftCluster";
+
+import type {
+  MultiLiveTelemetry,
+} from "./useMultiLiveTelemetry";
 
 import "./multiArchitecture.css";
 
 interface Props {
   cluster: MultiRaftClusterState;
+  telemetry: MultiLiveTelemetry;
 }
 
-const PLACEMENT = [
-  { id: 1, nodes: [1, 2, 3], start: 0, end: 16383 },
-  { id: 2, nodes: [2, 3, 4], start: 16384, end: 32767 },
-  { id: 3, nodes: [3, 4, 5], start: 32768, end: 49151 },
-  { id: 4, nodes: [1, 4, 5], start: 49152, end: 65535 },
-];
+export function MultiArchitecture({
+  cluster,
+  telemetry,
+}: Props) {
+  const [demoShard, setDemoShard] =
+    useState<DataShardID>(1);
 
-const COLORS = [
-  "#60a5fa",
-  "#2dd4bf",
-  "#c084fc",
-  "#fbbf24",
-];
+  const [demoRunning, setDemoRunning] =
+    useState(false);
 
-export function MultiArchitecture({ cluster }: Props) {
+  function selectDemoShard(shardId: DataShardID) {
+    if (!demoRunning) {
+      setDemoShard(shardId);
+    }
+  }
+
   const map = cluster.shardMap?.shard_map;
 
   return (
@@ -42,262 +59,131 @@ export function MultiArchitecture({ cluster }: Props) {
         </div>
       </header>
 
-      <article className="ma-panel">
-        <h2>End-to-end request path</h2>
+      <div className="sr-architecture-page">
+        <MultiArchitectureNavigation />
 
-        <div className="mx-flow">
-          <div className="mx-box mx-client">
-            <strong>Client / Query Console</strong>
-            <span>GET · PUT · DELETE · CAS</span>
-          </div>
+        <div
+          id="sr-arch-logical"
+          className="sr-architecture-section"
+        >
+          <MultiArchitectureCanvas
+            cluster={cluster}
+            telemetry={telemetry}
+          />
+        </div>
 
-          <div className="mx-arrow">↓</div>
+        <div
+          id="sr-arch-physical"
+          className="sr-architecture-section"
+        >
+          <MultiPhysicalDeployment
+            cluster={cluster}
+          />
+        </div>
 
-          <div className="mx-gateways">
-            {[1, 2].map(id => (
-              <div className="mx-box" key={id}>
-                <strong>Gateway {id}</strong>
+        <div
+          id="sr-arch-request"
+          className="sr-architecture-section"
+        >
+          <MultiRequestJourney
+            cluster={cluster}
+          />
+        </div>
 
-                <span>
-                  HTTP :{18090 + id}
-                </span>
+        <div
+          id="sr-arch-consensus"
+          className="sr-architecture-section"
+        >
+          <div className="mx-live-consensus-stack">
+            <MultiLiveWorkloadDemo
+              cluster={cluster}
+              selectedShard={demoShard}
+              onShardChange={selectDemoShard}
+              onRunningChange={setDemoRunning}
+            />
 
-                <small>
-                  Request routing and retry
-                </small>
-              </div>
-            ))}
-          </div>
-
-          <div className="mx-arrow">↓</div>
-
-          <div className="mx-box mx-metadata">
-            <strong>
-              Metadata discovery and key routing
-            </strong>
-
-            <span>
-              CRC32 → hash slot → shard ownership
-            </span>
-
-            <small>
-              Metadata epoch: {map?.epoch ?? "Unknown"}
-            </small>
-          </div>
-
-          <div className="mx-arrow">↓</div>
-
-          <div className="mx-shards">
-            {PLACEMENT.map((placement, index) => {
-              const shard = cluster.shards.find(
-                item => item.shardId === placement.id,
-              );
-
-              return (
-                <div
-                  className="mx-box"
-                  key={placement.id}
-                  style={{
-                    borderColor: COLORS[index],
-                  }}
-                >
-                  <strong
-                    style={{ color: COLORS[index] }}
-                  >
-                    Shard {placement.id}
-                  </strong>
-
-                  <span>
-                    {placement.start.toLocaleString()}
-                    {" – "}
-                    {placement.end.toLocaleString()}
-                  </span>
-
-                  <small>
-                    {shard?.leaderId
-                      ? `Leader: Node ${shard.leaderId}`
-                      : "Leader unknown"}
-                  </small>
-
-                  <small>
-                    {shard?.reachableReplicas ?? 0}/3
-                    replicas observed
-                  </small>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mx-arrow">↓</div>
-
-          <div className="mx-box">
-            <strong>gRPC Raft transport</strong>
-
-            <span>
-              Elections · AppendEntries · Replication
-            </span>
-          </div>
-
-          <div className="mx-arrow">↓</div>
-
-          <div className="mx-box">
-            <strong>Persistent storage</strong>
-
-            <span>
-              Segmented WAL · Pebble · Snapshots
-            </span>
+            <MultiArchitectureConsensus
+              cluster={cluster}
+              telemetry={telemetry}
+              selectedShard={demoShard}
+              onShardChange={selectDemoShard}
+              selectionLocked={demoRunning}
+            />
           </div>
         </div>
 
-        <p>
-          This diagram shows the configured request
-          path. It does not claim to trace individual
-          requests or verify gateway health.
-        </p>
-      </article>
-
-      <article className="ma-panel">
-        <h2>Physical node placement</h2>
-
-        <div className="mx-nodes">
-          {[1, 2, 3, 4, 5].map(nodeId => {
-            const hosted = PLACEMENT.filter(
-              item => item.nodes.includes(nodeId),
-            );
-
-            return (
-              <div
-                className="mx-node"
-                key={nodeId}
-              >
-                <strong>Node {nodeId}</strong>
-
-                <small>
-                  HTTP :{18080 + nodeId}
-                </small>
-
-                {hosted.map(placement => {
-                  const shard = cluster.shards.find(
-                    item =>
-                      item.shardId === placement.id,
-                  );
-
-                  const replica = shard?.replicas.find(
-                    item => item.nodeId === nodeId,
-                  );
-
-                  return (
-                    <div
-                      className="mx-replica"
-                      key={placement.id}
-                      style={{
-                        borderColor:
-                          COLORS[placement.id - 1],
-                      }}
-                    >
-                      <strong>
-                        Shard {placement.id}
-                      </strong>
-
-                      <small>
-                        {replica?.reachable
-                          ? replica.role
-                          : "Not observed"}
-                      </small>
-                    </div>
-                  );
-                })}
-
-                {nodeId <= 3 && (
-                  <div className="mx-replica mx-meta">
-                    <strong>Metadata</strong>
-
-                    <small>
-                      {cluster.metadataLeader === nodeId
-                        ? "Observed leader"
-                        : "Configured replica"}
-                    </small>
-                  </div>
-                )}
-
-                <div className="mx-disk">
-                  Persistent Docker volume
-                </div>
-              </div>
-            );
-          })}
+        <div
+          id="sr-arch-storage"
+          className="sr-architecture-section"
+        >
+          <MultiArchitectureStorage
+            cluster={cluster}
+          />
         </div>
 
-        <p>
-          Fixed deployment placement with live data
-          replica observations. Metadata group 5
-          is independent of the four data shards.
-        </p>
-      </article>
+        <article className="ma-panel mx-discovery">
+          <div className="mx-discovery-header">
+            <div>
+              <div className="eyebrow">
+                CONTROL PLANE DIAGNOSTICS
+              </div>
 
-      <article className="ma-panel">
-        <h2>Hash slot distribution</h2>
+              <h2>Metadata discovery</h2>
 
-        <div className="mx-slotbar">
-          {PLACEMENT.map((shard, index) => (
-            <div
-              key={shard.id}
-              style={{
-                background: `${COLORS[index]}20`,
-                borderColor: COLORS[index],
-              }}
+              <p>
+                Current shard map observed from
+                the metadata Raft group.
+              </p>
+            </div>
+
+            <span
+              className={
+                map
+                  ? "mx-discovery-status available"
+                  : "mx-discovery-status"
+              }
             >
-              <strong>Shard {shard.id}</strong>
+              <i />
+              {map ? "Map observed" : "Map unavailable"}
+            </span>
+          </div>
 
-              <span>16,384 slots</span>
+          {map ? (
+            <>
+              <div className="mx-discovery-metrics">
+                <div>
+                  <span>Metadata epoch</span>
+                  <strong>{map.epoch}</strong>
+                </div>
 
-              <small>
-                {shard.start.toLocaleString()}
-                {" – "}
-                {shard.end.toLocaleString()}
-              </small>
-            </div>
-          ))}
-        </div>
+                <div>
+                  <span>Total hash slots</span>
+                  <strong>
+                    {map.total_slots.toLocaleString()}
+                  </strong>
+                </div>
 
-        <p>
-          Configured layout: 65,536 slots distributed
-          equally across four data shards.
-        </p>
-      </article>
-
-      <article className="ma-panel">
-        <h2>Metadata discovery</h2>
-
-        {map ? (
-          <>
-            <div className="ma-stat-grid">
-              <div className="ma-stat">
-                <span>Metadata epoch</span>
-                <strong>{map.epoch}</strong>
+                <div>
+                  <span>Discovered shards</span>
+                  <strong>{map.shards.length}</strong>
+                </div>
               </div>
 
-              <div className="ma-stat">
-                <span>Total slots</span>
-                <strong>
-                  {map.total_slots.toLocaleString()}
-                </strong>
-              </div>
+              <details className="mx-discovery-details">
+                <summary>
+                  Inspect raw metadata response
+                </summary>
 
-              <div className="ma-stat">
-                <span>Discovered shards</span>
-                <strong>{map.shards.length}</strong>
-              </div>
-            </div>
-
-            <pre className="mx-json">
-              {JSON.stringify(map, null, 2)}
-            </pre>
-          </>
-        ) : (
-          <p>No metadata map is currently available.</p>
-        )}
-      </article>
+                <pre className="mx-json">
+                  {JSON.stringify(map, null, 2)}
+                </pre>
+              </details>
+            </>
+          ) : (
+            <p>No metadata map is currently available.</p>
+          )}
+        </article>
+      </div>
     </section>
   );
 }
