@@ -79,3 +79,33 @@ validation:
 
 validation-standard:
 	cd web && npm run validation:standard
+
+.PHONY: frontend-build frontend-test verify
+
+frontend-build:
+	cd web && npm run build
+
+frontend-test:
+	cd web && npm test
+
+verify: build vet test frontend-build frontend-test
+	@echo
+	@echo "ShardRAFT verification passed."
+
+.PHONY: multi-up multi-down multi-status multi-control multi-web
+
+multi-up:
+	docker compose up -d --build
+
+multi-down:
+	docker compose down
+
+multi-status:
+	docker compose ps
+
+multi-control:
+	go run ./cmd/shardraft-docker-control \
+		-addr 127.0.0.1:18090
+
+multi-web:
+	cd web && npm run dev
