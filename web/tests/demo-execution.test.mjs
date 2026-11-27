@@ -3,17 +3,17 @@ import assert from "node:assert/strict";
 
 import {
   createDemoWorkload,
-} from "../src/multi/demoWorkload.ts";
+} from "../.test-build/multi/demoWorkload.js";
 
 import {
   createDemoExecutionState,
   summarizeDemoExecution,
   startDemoExecution,
-} from "../src/multi/demoExecution.ts";
+} from "../.test-build/multi/demoExecution.js";
 
 import {
   GatewayRequestError,
-} from "../src/api/multiGateway.ts";
+} from "../.test-build/api/multiGateway.js";
 
 const map = {
   epoch: 1,

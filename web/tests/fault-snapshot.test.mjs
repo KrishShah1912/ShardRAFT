@@ -7,12 +7,12 @@ import {
   quorumTransition,
   reachabilityTransition,
   observeReplicaCatchUp,
-} from "../src/multi/faultSnapshot.ts";
+} from "../.test-build/multi/faultSnapshot.js";
 
 import {
   DATA_SHARDS,
   SHARD_PLACEMENT,
-} from "../src/multi/clusterState.ts";
+} from "../.test-build/multi/clusterState.js";
 
 const BASE = 1700000000000;
 

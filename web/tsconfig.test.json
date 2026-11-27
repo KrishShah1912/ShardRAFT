@@ -23,7 +23,12 @@
     "src/multi/liveEventStream.ts",
     "src/multi/useMultiLiveTelemetry.ts",
     "src/multi/electionTelemetry.ts",
-    "src/multi/replicationTelemetry.ts"
+    "src/multi/replicationTelemetry.ts",
+    "src/multi/demoExecution.ts",
+    "src/multi/demoWorkload.ts",
+    "src/multi/faultSnapshot.ts",
+    "src/multi/faultTimeline.ts",
+    "src/multi/quorumProtection.ts"
   ],
   "exclude": [
     "node_modules",

@@ -4,13 +4,13 @@ import assert from "node:assert/strict";
 import {
   assessNodeQuorum,
   MAX_OBSERVATION_AGE_MS,
-} from "../src/multi/quorumProtection.ts";
+} from "../.test-build/multi/quorumProtection.js";
 
 import {
   DATA_SHARDS,
   SHARD_PLACEMENT,
   METADATA_REPLICAS,
-} from "../src/multi/clusterState.ts";
+} from "../.test-build/multi/clusterState.js";
 
 const NOW = 1700000000000;
 
