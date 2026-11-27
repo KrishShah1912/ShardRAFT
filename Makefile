@@ -109,3 +109,11 @@ multi-control:
 
 multi-web:
 	cd web && npm run dev
+
+.PHONY: demo demo-down
+
+demo:
+	@./scripts/demo.sh
+
+demo-down:
+	@./scripts/demo-down.sh
